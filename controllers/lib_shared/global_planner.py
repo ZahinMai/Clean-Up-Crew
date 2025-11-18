@@ -3,6 +3,7 @@ from heapq import heappush, heappop
 from typing import List, Tuple, Optional
 
 class OccupancyGrid:
+    # 0 = free, 1 = occupied
     def __init__(self, width: int, height: int, cell_size: float = 0.5, 
                  origin: Tuple[float, float] = (0.0, 0.0)):
         self.width = width
@@ -12,6 +13,7 @@ class OccupancyGrid:
         self.grid = [[0 for _ in range(width)] for _ in range(height)]
     
     @classmethod
+    # Construct map from string representation (in map.py)
     def from_string(cls, map_string: str, cell_size: float = 0.5, 
                     origin: Tuple[float, float] = (0.0, 0.0)) -> 'OccupancyGrid':
         lines = [line.rstrip() for line in map_string.strip().split('\n') if line.strip()]
@@ -29,9 +31,10 @@ class OccupancyGrid:
         
         return grid
     
+    # Coordinate conversion methods
     def world_to_grid(self, x: float, z: float) -> Tuple[int, int]:
-        col = int((x - self.origin[0]) / self.cell_size)
-        row = int((z - self.origin[1]) / self.cell_size)
+        col = round((x - self.origin[0]) / self.cell_size)
+        row = round((z - self.origin[1]) / self.cell_size)
         return row, col
     
     def grid_to_world(self, row: int, col: int) -> Tuple[float, float]:
@@ -39,6 +42,7 @@ class OccupancyGrid:
         z = row * self.cell_size + self.origin[1] + self.cell_size / 2
         return x, z
     
+    # Validity and occupancy checks
     def is_valid(self, row: int, col: int) -> bool:
         return 0 <= row < self.height and 0 <= col < self.width
     
@@ -51,10 +55,11 @@ class OccupancyGrid:
         if self.is_valid(row, col):
             self.grid[row][col] = 1
 
+    # this method inflates obstacles by a given radius (in cells)      
     def inflate(self, radius: int) -> 'OccupancyGrid':
         inflated = OccupancyGrid(self.width, self.height, self.cell_size, self.origin)
         inflated.grid = [row[:] for row in self.grid]
-        
+
         obstacles = []
         for r in range(self.height):
             for c in range(self.width):
@@ -69,34 +74,27 @@ class OccupancyGrid:
                         inflated.set_obstacle(nr, nc)
         return inflated
     
-    def visualize(self):
+    # Simple text-based visualisation
+    def visualise(self):
         for row in self.grid:
             line = ''.join('#' if cell == 1 else '.' for cell in row)
             print(line)
 
 class AStarPlanner:
-    def __init__(self, allow_diagonal: bool = True):
-        self.allow_diagonal = allow_diagonal
-        
-        if allow_diagonal:
-            self.motions = [
-                (-1, 0, 1.0),
-                (1, 0, 1.0),
-                (0, -1, 1.0),
-                (0, 1, 1.0),
-                (-1, -1, 1.414),
-                (-1, 1, 1.414),
-                (1, -1, 1.414),
-                (1, 1, 1.414),
-            ]
-        else:
-            self.motions = [
-                (-1, 0, 1.0),
-                (1, 0, 1.0),
-                (0, -1, 1.0),
-                (0, 1, 1.0),
-            ]
+    def __init__(self):
+        # Possible movements: (dr, dc, cost)
+        self.motions = [
+            (-1, 0, 1.0),
+            (1, 0, 1.0),
+            (0, -1, 1.0),
+            (0, 1, 1.0),
+            (-1, -1, 1.414),
+            (-1, 1, 1.414),
+            (1, -1, 1.414),
+            (1, 1, 1.414),
+        ]
     
+    # Heuristic function: Euclidean distance
     def heuristic(self, pos1: Tuple[int, int], pos2: Tuple[int, int]) -> float:
         return math.hypot(pos2[0] - pos1[0], pos2[1] - pos1[1])
     
@@ -151,7 +149,7 @@ class AStarPlanner:
                 if not grid.is_free(*neighbor):
                     continue
                 
-                if self.allow_diagonal and self.is_diagonal_blocked(grid, current, neighbor):
+                if self.is_diagonal_blocked(grid, current, neighbor):
                     continue
                 
                 tentative_g = g_score[current] + cost

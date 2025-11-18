@@ -14,7 +14,7 @@ def visualise_robot_on_map(grid, robot_x: float, robot_z: float, robot_theta: fl
     
     # Create visualisation
     print("\n" + "=" * 70)
-    print("MAP VISUALIsatION")
+    print("MAP VISUALISATION")
     print("=" * 70)
     print(f"Robot: world ({robot_x:.2f}, {robot_z:.2f}) = grid {robot_grid}")
     print(f"       orientation: {math.degrees(robot_theta):.0f}°")
@@ -74,9 +74,6 @@ def visualise_robot_on_map(grid, robot_x: float, robot_z: float, robot_theta: fl
 
 
 def print_coordinate_info(grid, robot_x: float, robot_z: float):
-    """
-    Print detailed coordinate transformation info
-    """
     robot_grid = grid.world_to_grid(robot_x, robot_z)
     back_to_world = grid.grid_to_world(robot_grid[0], robot_grid[1])
     
@@ -106,7 +103,7 @@ def print_coordinate_info(grid, robot_x: float, robot_z: float):
         print(f"  Cell free? {is_free}")
         print(f"  Cell value: {grid.grid[robot_grid[0]][robot_grid[1]]}")
     else:
-        print(f"  ⚠ WARNING: Robot is outside map bounds!")
+        print(f"WARNING: Robot is outside map bounds!")
     
     print("=" * 70 + "\n")
 
@@ -171,15 +168,13 @@ def test_visualisation():
     from map import get_map
     
     grid = get_map()
-    
-    # Check map configuration
     check_map_alignment(grid)
     
     # Test with sample robot position
     robot_x, robot_z = 0.8, 0.2
     robot_theta = 0.5
     goal_x, goal_z = 5.0, 5.0
-    
+
 
     print_coordinate_info(grid, robot_x, robot_z)
     visualise_robot_on_map(grid, robot_x, robot_z, robot_theta, goal_x, goal_z)
