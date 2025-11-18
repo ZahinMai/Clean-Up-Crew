@@ -1,277 +1,215 @@
-# A* Pathfinding Algorithm for 2D Grid Navigation
-# Author: Zahin Maisa
-"""
-Usage:
-    from global_planner import AStarPlanner
-    from navigation import OccupancyGrid
-    
-    planner = AStarPlanner(allow_diagonal=True)
-    path = planner.find_path(grid, start=(0, 0), goal=(10, 10))
-"""
-
-import heapq
 import math
-from typing import List, Tuple
+from heapq import heappush, heappop
+from typing import List, Tuple, Optional
 
+class OccupancyGrid:
+    def __init__(self, width: int, height: int, cell_size: float = 0.5, 
+                 origin: Tuple[float, float] = (0.0, 0.0)):
+        self.width = width
+        self.height = height
+        self.cell_size = cell_size
+        self.origin = origin
+        self.grid = [[0 for _ in range(width)] for _ in range(height)]
+    
+    @classmethod
+    def from_string(cls, map_string: str, cell_size: float = 0.5, 
+                    origin: Tuple[float, float] = (0.0, 0.0)) -> 'OccupancyGrid':
+        lines = [line.rstrip() for line in map_string.strip().split('\n') if line.strip()]
+        height = len(lines)
+        width = max(len(line) for line in lines)
+        
+        grid = cls(width, height, cell_size, origin)
+        
+        for row, line in enumerate(lines):
+            for col, char in enumerate(line):
+                if char == '#':
+                    grid.grid[row][col] = 1
+                else:
+                    grid.grid[row][col] = 0
+        
+        return grid
+    
+    def world_to_grid(self, x: float, z: float) -> Tuple[int, int]:
+        col = int((x - self.origin[0]) / self.cell_size)
+        row = int((z - self.origin[1]) / self.cell_size)
+        return row, col
+    
+    def grid_to_world(self, row: int, col: int) -> Tuple[float, float]:
+        x = col * self.cell_size + self.origin[0] + self.cell_size / 2
+        z = row * self.cell_size + self.origin[1] + self.cell_size / 2
+        return x, z
+    
+    def is_valid(self, row: int, col: int) -> bool:
+        return 0 <= row < self.height and 0 <= col < self.width
+    
+    def is_free(self, row: int, col: int) -> bool:
+        if not self.is_valid(row, col):
+            return False
+        return self.grid[row][col] == 0
+    
+    def set_obstacle(self, row: int, col: int):
+        if self.is_valid(row, col):
+            self.grid[row][col] = 1
+
+    def inflate(self, radius: int) -> 'OccupancyGrid':
+        inflated = OccupancyGrid(self.width, self.height, self.cell_size, self.origin)
+        inflated.grid = [row[:] for row in self.grid]
+        
+        obstacles = []
+        for r in range(self.height):
+            for c in range(self.width):
+                if not self.is_free(r, c):
+                    obstacles.append((r, c))
+        
+        for r, c in obstacles:
+            for dr in range(-radius, radius + 1):
+                for dc in range(-radius, radius + 1):
+                    nr, nc = r + dr, c + dc
+                    if inflated.is_valid(nr, nc):
+                        inflated.set_obstacle(nr, nc)
+        return inflated
+    
+    def visualize(self):
+        for row in self.grid:
+            line = ''.join('#' if cell == 1 else '.' for cell in row)
+            print(line)
 
 class AStarPlanner:
-    """A* pathfinding algorithm for grid-based navigation."""
-    
-    class Node:
-        """Represents a node in the A* search."""
-        
-        def __init__(self, position: Tuple[int, int], parent=None):
-            self.position = position
-            self.parent = parent
-            self.g = 0  # Cost from start
-            self.h = 0  # Heuristic cost to goal
-            self.f = 0  # Total cost (g + h)
-        
-        def __eq__(self, other):
-            return self.position == other.position
-        
-        def __lt__(self, other):
-            return self.f < other.f
-        
-        def __hash__(self):
-            return hash(self.position)
-    
     def __init__(self, allow_diagonal: bool = True):
         self.allow_diagonal = allow_diagonal
         
         if allow_diagonal:
-            # 8-directional movement
-            self.directions = [
-                (-1, 0, 1.0),   # Up
-                (1, 0, 1.0),    # Down
-                (0, -1, 1.0),   # Left
-                (0, 1, 1.0),    # Right
-                (-1, -1, 1.414), # Up-Left (diagonal)
-                (-1, 1, 1.414),  # Up-Right (diagonal)
-                (1, -1, 1.414),  # Down-Left (diagonal)
-                (1, 1, 1.414),   # Down-Right (diagonal)
+            self.motions = [
+                (-1, 0, 1.0),
+                (1, 0, 1.0),
+                (0, -1, 1.0),
+                (0, 1, 1.0),
+                (-1, -1, 1.414),
+                (-1, 1, 1.414),
+                (1, -1, 1.414),
+                (1, 1, 1.414),
             ]
         else:
-            # 4-directional movement
-            self.directions = [
-                (-1, 0, 1.0),   # Up
-                (1, 0, 1.0),    # Down
-                (0, -1, 1.0),   # Left
-                (0, 1, 1.0),    # Right
+            self.motions = [
+                (-1, 0, 1.0),
+                (1, 0, 1.0),
+                (0, -1, 1.0),
+                (0, 1, 1.0),
             ]
     
-    #  Calculate heuristic distance (Euclidean or Manhattan).
     def heuristic(self, pos1: Tuple[int, int], pos2: Tuple[int, int]) -> float:
-        if self.allow_diagonal:
-            # Euclidean distance for diagonal movement
-            return math.sqrt((pos2[0] - pos1[0])**2 + (pos2[1] - pos1[1])**2)
-        else:
-            # Manhattan distance for 4-directional movement
-            return abs(pos2[0] - pos1[0]) + abs(pos2[1] - pos1[1])
+        return math.hypot(pos2[0] - pos1[0], pos2[1] - pos1[1])
     
-    def is_valid_position(self, grid, position: Tuple[int, int]) -> bool:
-
-        row, col = position
+    def is_diagonal_blocked(self, grid: OccupancyGrid, 
+                           current: Tuple[int, int], 
+                           neighbor: Tuple[int, int]) -> bool:
+        dr = neighbor[0] - current[0]
+        dc = neighbor[1] - current[1]
         
-        # Handle both OccupancyGrid objects and raw 2D lists
-        if hasattr(grid, 'is_free'):
-            # OccupancyGrid object
-            return grid.is_free(row, col)
-        else:
-            # Raw 2D list
-            rows = len(grid)
-            cols = len(grid[0]) if rows > 0 else 0
+        if abs(dr) == 1 and abs(dc) == 1:
+            adj1 = (current[0] + dr, current[1])
+            adj2 = (current[0], current[1] + dc)
             
-            # Check bounds
-            if row < 0 or row >= rows or col < 0 or col >= cols:
-                return False
-            
-            # Check obstacle (0 = free, 1 = occupied)
-            return grid[row][col] == 0
-    
-    def is_diagonal_blocked(self, grid, current_pos: Tuple[int, int], 
-                           next_pos: Tuple[int, int]) -> bool:
-        curr_row, curr_col = current_pos
-        next_row, next_col = next_pos
-        
-        row_diff = next_row - curr_row
-        col_diff = next_col - curr_col
-        
-        # Only check for diagonal moves
-        if abs(row_diff) == 1 and abs(col_diff) == 1:
-            # Check the two adjacent cells
-            adj1 = (curr_row + row_diff, curr_col)
-            adj2 = (curr_row, curr_col + col_diff)
-            
-            # If either adjacent cell is blocked, diagonal is blocked
-            if not self.is_valid_position(grid, adj1) or \
-               not self.is_valid_position(grid, adj2):
+            if not grid.is_free(*adj1) or not grid.is_free(*adj2):
                 return True
         
         return False
     
-    def get_neighbors(self, grid, current_pos: Tuple[int, int]) -> List[Tuple[Tuple[int, int], float]]:
-        neighbors = []
-        curr_row, curr_col = current_pos
+    def plan(self, grid: OccupancyGrid, 
+             start: Tuple[int, int], 
+             goal: Tuple[int, int]) -> Optional[List[Tuple[int, int]]]:
+        if not grid.is_free(*start):
+            return None
         
-        for dr, dc, cost in self.directions:
-            neighbor_pos = (curr_row + dr, curr_col + dc)
-            
-            # Check if position is valid
-            if not self.is_valid_position(grid, neighbor_pos):
-                continue
-            
-            # For diagonal moves, check if blocked by adjacent obstacles
-            if self.allow_diagonal and self.is_diagonal_blocked(grid, current_pos, neighbor_pos):
-                continue
-            
-            neighbors.append((neighbor_pos, cost))
+        if not grid.is_free(*goal):
+            return None
         
-        return neighbors
-    
-    # Reconstruct path from start to goal by following parent pointers.
-    def reconstruct_path(self, current_node) -> List[Tuple[int, int]]:
-        path = []
-        current = current_node
+        open_set = []
+        counter = 0
+        heappush(open_set, (0, counter, start, [start]))
         
-        while current is not None:
-            path.append(current.position)
-            current = current.parent
-        
-        # Reverse to get path from start to goal
-        path.reverse()
-        return path
-    
-    # The main A* pathfinding method
-    def find_path(self, grid, start: Tuple[int, int], goal: Tuple[int, int]) -> List[Tuple[int, int]]:
-        # Validate input
-        if not self.is_valid_position(grid, start):
-            print(f"Error: Start position {start} is invalid or blocked")
-            return []
-        
-        if not self.is_valid_position(grid, goal):
-            print(f"Error: Goal position {goal} is invalid or blocked")
-            return []
-        
-        # Initialise start and goal nodes
-        start_node = self.Node(start)
-        start_node.g = 0
-        start_node.h = self.heuristic(start, goal)
-        start_node.f = start_node.h
-        
-        # Open list (priority queue) and closed set
-        open_list = []
-        heapq.heappush(open_list, start_node)
-        
+        g_score = {start: 0}
         closed_set = set()
-        open_dict = {start: start_node}  # For quick lookup
         
-        # Statistics
-        nodes_explored = 0
-        
-        # Main A* loop
-        while open_list:
-            # Get node with lowest f score
-            current_node = heapq.heappop(open_list)
-            current_pos = current_node.position
+        while open_set:
+            _, _, current, path = heappop(open_set)
             
-            # Remove from open dict
-            if current_pos in open_dict:
-                del open_dict[current_pos]
+            if current in closed_set:
+                continue
             
-            # Add to closed set
-            closed_set.add(current_pos)
-            nodes_explored += 1
+            closed_set.add(current)
             
-            # Check if we reached the goal
-            if current_pos == goal:
-                path = self.reconstruct_path(current_node)
-                print(f"A* found path: {nodes_explored} nodes explored, {len(path)} steps")
+            if current == goal:
                 return path
             
-            # Explore neighbors
-            for neighbor_pos, move_cost in self.get_neighbors(grid, current_pos):
-                # Skip if already in closed set
-                if neighbor_pos in closed_set:
+            for dr, dc, cost in self.motions:
+                neighbor = (current[0] + dr, current[1] + dc)
+                
+                if neighbor in closed_set:
                     continue
                 
-                # Calculate new g score
-                new_g = current_node.g + move_cost
+                if not grid.is_free(*neighbor):
+                    continue
                 
-                # Check if neighbor is in open list
-                if neighbor_pos in open_dict:
-                    neighbor_node = open_dict[neighbor_pos]
-                    # Update if we found a better path
-                    if new_g < neighbor_node.g:
-                        neighbor_node.g = new_g
-                        neighbor_node.f = neighbor_node.g + neighbor_node.h
-                        neighbor_node.parent = current_node
-                        # Re-heapify
-                        heapq.heapify(open_list)
-                else:
-                    # Create new neighbor node
-                    neighbor_node = self.Node(neighbor_pos, current_node)
-                    neighbor_node.g = new_g
-                    neighbor_node.h = self.heuristic(neighbor_pos, goal)
-                    neighbor_node.f = neighbor_node.g + neighbor_node.h
-                    
-                    heapq.heappush(open_list, neighbor_node)
-                    open_dict[neighbor_pos] = neighbor_node
+                if self.allow_diagonal and self.is_diagonal_blocked(grid, current, neighbor):
+                    continue
+                
+                tentative_g = g_score[current] + cost
+                
+                if neighbor not in g_score or tentative_g < g_score[neighbor]:
+                    g_score[neighbor] = tentative_g
+                    f_score = tentative_g + self.heuristic(neighbor, goal)
+                    counter += 1
+                    heappush(open_set, (f_score, counter, neighbor, path + [neighbor]))
         
-        # No path found
-        print(f"A* failed: No path found after exploring {nodes_explored} nodes")
-        return []
-
-
-# Example usage and testing
-if __name__ == "__main__":
-    print("Testing A* Planner")
-    print("=" * 60)
+        return None
     
-    # Simple test grid (0 = free, 1 = obstacle)
-    test_grid = [
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
-        [0, 1, 1, 1, 1, 1, 1, 0, 1, 0],
-        [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-        [0, 1, 1, 1, 1, 0, 1, 1, 1, 0],
-        [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-        [0, 1, 1, 0, 1, 1, 1, 1, 1, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    ]
-    
-    planner = AStarPlanner(allow_diagonal=True)
-    
-    start = (0, 0)
-    goal = (9, 9)
-    
-    print(f"Finding path from {start} to {goal}...")
-    path = planner.find_path(test_grid, start, goal)
-    
-    if path:
-        print(f"\n✓ Path found with {len(path)} steps")
-        print(f"Path: {path[:5]}...{path[-5:]}")
+    def smooth_path(self, grid: OccupancyGrid, 
+                    path: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
+        if len(path) <= 2:
+            return path
         
-        # Visualise the path
-        print("\nVisualisation (S=Start, G=Goal, #=Obstacle, +=Path, .=Free):")
-        for row_idx, row in enumerate(test_grid):
-            line = []
-            for col_idx, cell in enumerate(row):
-                pos = (row_idx, col_idx)
-                if pos == start:
-                    line.append('S')
-                elif pos == goal:
-                    line.append('G')
-                elif pos in path:
-                    line.append('+')
-                elif cell == 1:
-                    line.append('#')
-                else:
-                    line.append('.')
-            print(''.join(line))
-    else:
-        print("\n✗ No path found!")
+        smoothed = [path[0]]
+        current_idx = 0
+        
+        while current_idx < len(path) - 1:
+            for i in range(len(path) - 1, current_idx, -1):
+                if self._line_of_sight(grid, path[current_idx], path[i]):
+                    smoothed.append(path[i])
+                    current_idx = i
+                    break
+            else:
+                current_idx += 1
+                if current_idx < len(path):
+                    smoothed.append(path[current_idx])
+        
+        return smoothed
     
-    print("=" * 60)
+    def _line_of_sight(self, grid: OccupancyGrid, 
+                       p1: Tuple[int, int], 
+                       p2: Tuple[int, int]) -> bool:
+        r0, c0 = p1
+        r1, c1 = p2
+        
+        dr = abs(r1 - r0)
+        dc = abs(c1 - c0)
+        sr = 1 if r0 < r1 else -1
+        sc = 1 if c0 < c1 else -1
+        err = dr - dc
+        
+        r, c = r0, c0
+        
+        while True:
+            if not grid.is_free(r, c):
+                return False
+            
+            if r == r1 and c == c1:
+                return True
+            
+            e2 = 2 * err
+            if e2 > -dc:
+                err -= dc
+                r += sr
+            if e2 < dr:
+                err += dr
+                c += sc
