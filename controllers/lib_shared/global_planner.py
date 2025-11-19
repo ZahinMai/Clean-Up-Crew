@@ -4,7 +4,7 @@ from typing import List, Tuple, Optional
 
 class OccupancyGrid:
     # 0 = free, 1 = occupied
-    def __init__(self, width: int, height: int, cell_size: float = 0.5, 
+    def __init__(self, width: int, height: int, cell_size: float = 0.246, 
                  origin: Tuple[float, float] = (0.0, 0.0)):
         self.width = width
         self.height = height
@@ -14,7 +14,7 @@ class OccupancyGrid:
     
     @classmethod
     # Construct map from string representation (in map.py)
-    def from_string(cls, map_string: str, cell_size: float = 0.5, 
+    def from_string(cls, map_string: str, cell_size: float = 0.246, 
                     origin: Tuple[float, float] = (0.0, 0.0)) -> 'OccupancyGrid':
         lines = [line.rstrip() for line in map_string.strip().split('\n') if line.strip()]
         height = len(lines)
@@ -33,8 +33,8 @@ class OccupancyGrid:
     
     # Coordinate conversion methods
     def world_to_grid(self, x: float, z: float) -> Tuple[int, int]:
-        col = round((x - self.origin[0]) / self.cell_size)
-        row = round((z - self.origin[1]) / self.cell_size)
+        col = int((x - self.origin[0]) / self.cell_size)
+        row = int((z - self.origin[1]) / self.cell_size)
         return row, col
     
     def grid_to_world(self, row: int, col: int) -> Tuple[float, float]:
@@ -113,6 +113,7 @@ class AStarPlanner:
         
         return False
     
+    # Main A* planning method
     def plan(self, grid: OccupancyGrid, 
              start: Tuple[int, int], 
              goal: Tuple[int, int]) -> Optional[List[Tuple[int, int]]]:
@@ -143,13 +144,10 @@ class AStarPlanner:
             for dr, dc, cost in self.motions:
                 neighbor = (current[0] + dr, current[1] + dc)
                 
-                if neighbor in closed_set:
-                    continue
-                
-                if not grid.is_free(*neighbor):
-                    continue
-                
-                if self.is_diagonal_blocked(grid, current, neighbor):
+                # Skip invalid, occupied, or diagonally blocked neighbors
+                if (neighbor in closed_set
+                        or not grid.is_free(*neighbor)
+                        or self.is_diagonal_blocked(grid, current, neighbor)):
                     continue
                 
                 tentative_g = g_score[current] + cost
@@ -159,7 +157,7 @@ class AStarPlanner:
                     f_score = tentative_g + self.heuristic(neighbor, goal)
                     counter += 1
                     heappush(open_set, (f_score, counter, neighbor, path + [neighbor]))
-        
+    
         return None
     
     def smooth_path(self, grid: OccupancyGrid, 
@@ -167,8 +165,8 @@ class AStarPlanner:
         if len(path) <= 2:
             return path
         
-        smoothed = [path[0]]
-        current_idx = 0
+        smoothed = [path[0]] # Add start point
+        current_idx = 0 # index of last added point
         
         while current_idx < len(path) - 1:
             for i in range(len(path) - 1, current_idx, -1):
@@ -197,13 +195,13 @@ class AStarPlanner:
         
         r, c = r0, c0
         
+        # Bresenham's line algorithm -> check cells along the line
         while True:
             if not grid.is_free(r, c):
                 return False
             
             if r == r1 and c == c1:
                 return True
-            
             e2 = 2 * err
             if e2 > -dc:
                 err -= dc
