@@ -70,7 +70,7 @@ def odometry_goto_step(og):
     # "v_c" is the robot's velocity in its longitudinal direction
     # the values range from -1000 to +1000
     # which corresponds approx. to max. 130mm/s
-    v_adapt = 200 / 0.13  # conversion-factor for speed in [m/s] to e-Puck speed units
+    v_adapt = 2000 / 0.13  # conversion-factor for speed in [m/s] to e-Puck speed units
     
     # "omega_c" is the robot's rotational speed around the vertical axis
     # (positive for turns in counter-clockwise direction)

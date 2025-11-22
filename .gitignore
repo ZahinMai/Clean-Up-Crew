@@ -9,8 +9,9 @@
 #Testing Output folder
 .output/
 # OS generated files
-.*
-#Rapid Application Development File
-rad.json
-#Test results file
+.DS_Store
+# Test result files
 TestResults.xml
+# Python cache files
+*.pyc
+__pycache__/

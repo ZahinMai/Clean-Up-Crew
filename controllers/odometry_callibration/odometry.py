@@ -1,6 +1,6 @@
 import math
 PI = math.pi
-#--------------CALLIBRATION FOR ACCURATE ODOMETRY--------------
+
 increments_per_tour = 1000.0 
 axis_wheel_ratio = 0.16
 wheel_diameter_left = 0.033

@@ -1,14 +1,20 @@
 from controller import Robot
 import math, os, sys
 
+''''
+SimpleNavigator class uses A* to plan a path on an occupancy grid.
+- main loop gets robot's pose & uses the navigator (global_pplanner) to plan/replan paths to waypoints.
+- wheel speeds are adjusted based on angle to next waypoint using a proportional controller.
+- robot moves towards each waypoint in sequence, replanning as needed to account for drift.
+'''
 # ----- allow importing ../lib_shared -----------------------------------------
 THIS_DIR = os.path.dirname(__file__)
 CTRL_DIR = os.path.dirname(THIS_DIR)
 if CTRL_DIR not in sys.path:
     sys.path.append(CTRL_DIR)
 
-from lib_shared.global_planner import AStarPlanner, OccupancyGrid
-from lib_shared.map_module import visualise_robot_on_map, print_coordinate_info, check_map_alignment, get_map
+from lib_shared.global_planner import AStarPlanner
+from lib_shared.map_module import visualise_robot_on_map, check_map_alignment, get_map
 
 LEFT_MOTOR = 'left wheel motor'
 RIGHT_MOTOR = 'right wheel motor'
@@ -20,11 +26,12 @@ GPS_NAME = 'gps'
 WHEEL_RADIUS = 0.033
 AXLE_LENGTH = 0.16
 
-WAYPOINT_TOLERANCE = 0.1
+WAYPOINT_TOLERANCE = 0.2
 REPLAN_INTERVAL = 0.1 # Replan often to correct drift
 REPLAN_DISTANCE = 0.1
-LOOKAHEAD = 1
+LOOKAHEAD = 2
 
+# yaw = rotation around vertical axis
 def get_yaw(imu, compass):
     if imu:
         r, p, y = imu.getRollPitchYaw()
@@ -37,12 +44,14 @@ def get_yaw(imu, compass):
 class SimpleNavigator:
     def __init__(self, occupancy_grid):
         self.grid = occupancy_grid
-        self.inflated_grid = self.grid.inflate(radius=0) # Inflate by 1 cell (0.25m) for safety
+        # [FIX 1] Increased radius to 1. 
+        # radius=0 treated robot as a dot. radius=1 gives a safety buffer for wheels.
+        self.inflated_grid = self.grid.inflate(radius=1) 
         self.astar = AStarPlanner()
-        self.global_path = [] # path in grid coordinates
-        self.global_path_world = [] # path in world coordinates
-        self.current_wp_idx = 0 # index of current waypoint
-        self.last_replan_time = -100.0 # this ensures immediate first plan
+        self.global_path = [] 
+        self.global_path_world = [] 
+        self.current_wp_idx = 0 
+        self.last_replan_time = -100.0 
 
     def plan_path(self, start_x, start_z, goal_x, goal_z):
         grid_to_plan = self.inflated_grid
@@ -83,7 +92,6 @@ class SimpleNavigator:
     def should_replan(self, robot_x, robot_z, time):
         if not self.global_path_world: return False
         if time - self.last_replan_time < REPLAN_INTERVAL: return False
-        # Simple distance check to current waypoint
         if self.current_wp_idx < len(self.global_path_world):
              wx, wz = self.global_path_world[self.current_wp_idx]
              dist = math.hypot(wx - robot_x, wz - robot_z)
@@ -111,7 +119,6 @@ def main():
     robot = Robot()
     ts = int(robot.getBasicTimeStep())
 
-    # get & setup motors
     lm = robot.getDevice(LEFT_MOTOR)
     rm = robot.getDevice(RIGHT_MOTOR)
     lm.setPosition(float('inf'))
@@ -119,11 +126,10 @@ def main():
     lm.setVelocity(0.0)
     rm.setVelocity(0.0)
 
-    # get & enable sensors
     imu = robot.getDevice(IMU_NAME)
-    if imu: imu.enable(ts) # not all robots have IMU
+    if imu: imu.enable(ts) 
     compass = robot.getDevice(COMPASS_NAME)
-    if compass: compass.enable(ts) # not all robots have compass
+    if compass: compass.enable(ts) 
     gps = robot.getDevice(GPS_NAME)
     gps.enable(ts)
     
@@ -131,9 +137,12 @@ def main():
     check_map_alignment(grid)
     navigator = SimpleNavigator(grid)
 
-    V_MAX = 0.3 # forward speed 
-    W_MAX = 2.5 # sharpness of turns           
-    KP_TURN = 2.0 # turning gain
+    V_MAX = 0.3 
+    W_MAX = 2.5          
+    KP_TURN = 2.0 
+    
+    BRAKING_DISTANCE = 1 # Start slowing down 1m from final goal
+    MIN_SPEED = 0.01       # Keep moving enough to reach the tolerance zone
     
     MISSION = [(3.5, 3.0, "Goal 1")]
     mission_idx = 0
@@ -167,6 +176,7 @@ def main():
 
         navigator.get_progress()
         waypoint = navigator.get_next_waypoint(x, z)
+        
         if waypoint is None:
             mission_idx += 1
             path_planned = False
@@ -177,18 +187,27 @@ def main():
         # Steering by adjusting wheel speed ratio
         dx = waypoint[0] - x
         dz = waypoint[1] - z
+        dist = math.hypot(dx, dz) # [FIX 3] Calculate exact distance for control
         
-        # Calculate target angle in standard math frame
-        target_angle = math.atan2(-dz, dx) # North is -Z.
+        target_angle = math.atan2(-dz, dx) 
         
-        # Calculate error & wrap to [-pi, pi]
         error = target_angle - yaw
         while error > math.pi: error -= 2 * math.pi
         while error < -math.pi: error += 2 * math.pi
 
-        # adjust v,w based on angle error, normalise to max speeds
         w = KP_TURN * error
-        v = V_MAX * max(0.0, 1.0 - abs(error) / 0.5) # Slow down if error > 0.5 rad
+        
+        # Base speed: slow down if turning sharply
+        v = V_MAX * max(0.0, 1.0 - abs(error) / 0.5) 
+
+        # Braking Ramp Logic - if target waypoint is FINAL in path, brake as approaching
+        is_final_leg = (waypoint == navigator.global_path_world[-1])
+        if is_final_leg and dist < BRAKING_DISTANCE:
+            ramp_factor = dist / BRAKING_DISTANCE
+            v = v * ramp_factor
+            
+            # Ensure we don't stall completely before reaching WAYPOINT_TOLERANCE (0.2)
+            if v < MIN_SPEED: v = MIN_SPEED
 
         v = max(0.0, min(V_MAX, v))
         w = max(-W_MAX, min(W_MAX, w))
