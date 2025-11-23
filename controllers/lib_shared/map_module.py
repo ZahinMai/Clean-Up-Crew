@@ -3,16 +3,9 @@ from typing import Tuple, Optional, List
 from .global_planner import OccupancyGrid
 
 # --- CONFIGURATION ---
-# 35 columns (Width), 21 rows (Height)
-GRID_W, GRID_H = 35, 21
-
-# World: 12.86m x 7.7m. 
+GRID_W, GRID_H = 35, 21 # cells
 DEFAULT_CELL_SIZE = 7.7/21 # meters
-
-# Anchor: Top-Left World Coordinates
-TOP_LEFT_X = -6.0
-TOP_LEFT_Y = 4.7
-
+ORIGIN = -5.8, -3 # meters (bottom-left corner in world coordinates)
 # The 21x35 Map String
 CAFETERIA_MAP = """
 ###################################
@@ -40,30 +33,13 @@ CAFETERIA_MAP = """
 
 class MapService:
     @staticmethod
-    def calculate_origin(top_left_x: float, top_left_y: float, 
-                         height_cells: int, cell_size: float) -> Tuple[float, float]:
-        # Origin X (Min X) is the Left Edge
-        origin_x = top_left_x
-        
-        # Origin Y (Min Y) is Top Edge minus Height
-        origin_y = top_left_y - (height_cells * cell_size)
-        
-        return (origin_x, origin_y)
+    def get_map() -> OccupancyGrid: 
+        return OccupancyGrid.from_string(CAFETERIA_MAP, DEFAULT_CELL_SIZE, ORIGIN)
 
     @staticmethod
-    def get_map() -> OccupancyGrid:
-        # Calculate origin dynamically from the anchor point
-        origin = MapService.calculate_origin(TOP_LEFT_X, TOP_LEFT_Y, GRID_H, DEFAULT_CELL_SIZE)
-        print(f"Map Loaded. Anchor: ({TOP_LEFT_X}, {TOP_LEFT_Y}) -> Origin: {origin}")
-        # Using positional args for robustness
-        return OccupancyGrid.from_string(CAFETERIA_MAP, DEFAULT_CELL_SIZE, origin)
-
-    @staticmethod
-    def visualise(grid: OccupancyGrid, rx: float, rz: float, yaw: float, 
-                  goals: Optional[List[Tuple[float, float]]] = None, path=None):
+    def visualise(grid: OccupancyGrid, rx: float, rz: float, yaw: float, goals: Optional[List[Tuple[float, float]]] = None, path=None):
         r_grid = grid.world_to_grid(rx, rz)
         path_set = set(path) if path else set()
-        
         angle = yaw % (2 * math.pi)
         sector = int((angle + math.pi/8) / (math.pi/4)) % 8
         arrows_ccw = ['→', '↗', '↑', '↖', '←', '↙', '↓', '↘']
@@ -83,6 +59,7 @@ class MapService:
         end_c = min(grid.width, start_c + 34)
         start_c = max(0, end_c - 34)
 
+        # for each row print the cells as # . + →
         for r in range(start_r, end_r):
             line = []
             for c in range(start_c, end_c):
@@ -90,16 +67,16 @@ class MapService:
                 elif (r,c) in path_set: line.append('+')
                 elif grid.grid[r][c] == 1: line.append('#')
                 else: line.append('.')
-            print(f"{r:02d} {''.join(line)}")
+            print(f"{r:02d} {''.join(line)}") # print row index
         
         if not grid.is_valid(r_grid[0], r_grid[1]):
-            print(f"⚠ ROBOT OUT OF BOUNDS! Grid: {r_grid}")
-            
-        print("-" * 40)
-
+            print(f"ROBOT OUT OF BOUNDS! Grid: {r_grid}")
+        
 def get_map(robot=None, gps=None, timestep=None, force_recalibrate=False, verbose=True):
     return MapService.get_map()
 
+
+# for debugging/visualisation
 def visualise_robot_on_map(grid, rx, rz, yaw, gx=None, gz=None, path=None):
     MapService.visualise(grid, rx, rz, yaw, path=path)
 

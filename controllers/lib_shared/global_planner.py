@@ -8,9 +8,6 @@ class OccupancyGrid:
         self.cell_size = cell_size
         self.origin = origin
         self.grid = [[0] * width for _ in range(height)]
-        
-        # Top-Down Logic: Row 0 corresponds to Max Y
-        # Max Y = Origin Y (Bottom) + Height * CellSize
         self.max_y = origin[1] + height * cell_size
     
     @classmethod
@@ -24,23 +21,20 @@ class OccupancyGrid:
                 if char == '#': obj.grid[r][c] = 1
         return obj
     
+    # NOTE:  [-x, x] is left -> right, [+y, y] is bottom -> top
     def world_to_grid(self, x: float, y: float) -> Tuple[int, int]:
-        # X maps to Column (Left to Right)
         c = math.floor((x - self.origin[0]) / self.cell_size)
-        
-        # Y maps to Row (Top to Bottom)
-        # Row 0 is at Max Y. Row increases as Y decreases.
-        r = math.floor((self.max_y - y) / self.cell_size)
-        
+        r = math.floor((self.max_y - y) / self.cell_size)        
         return r, c
 
+    # NOTE: returns center of cell
     def grid_to_world(self, r: int, c: int) -> Tuple[float, float]:
         x = c * self.cell_size + self.origin[0] + self.cell_size/2
-        
-        # y = Max_Y - (row * cell_size) - half_cell
         y = self.max_y - (r * self.cell_size) - self.cell_size/2
         return x, y
     
+    # NOTE: Cconverting baxk and forth will lose precision due to flooring
+
     def is_valid(self, r: int, c: int) -> bool:
         return 0 <= r < self.height and 0 <= c < self.width
 
@@ -51,9 +45,9 @@ class OccupancyGrid:
     def inflate(self, radius: int) -> 'OccupancyGrid':
         new_grid = OccupancyGrid(self.width, self.height, self.cell_size, self.origin)
         new_grid.grid = [row[:] for row in self.grid]
-        
         obstacles = [(r,c) for r in range(self.height) for c in range(self.width) if not self.is_free(r,c)]
         
+        # add 1s aeround each obstacle cell
         for r, c in obstacles:
             for dr in range(-radius, radius+1):
                 for dc in range(-radius, radius+1):
@@ -63,8 +57,7 @@ class OccupancyGrid:
 
 class AStarPlanner:
     def __init__(self):
-        self.moves = [(-1,0,1), (1,0,1), (0,-1,1), (0,1,1)] + \
-                     [(d1, d2, 1.414) for d1 in (-1,1) for d2 in (-1,1)]
+        self.moves = [(-1,0,1), (1,0,1), (0,-1,1), (0,1,1)] + [(d1, d2, 1.414) for d1 in (-1,1) for d2 in (-1,1)]
     
     def plan(self, grid: OccupancyGrid, start: Tuple[int, int], goal: Tuple[int, int]) -> Optional[List[Tuple[int, int]]]:
         if not (grid.is_free(*start) and grid.is_free(*goal)): return None
@@ -89,3 +82,59 @@ class AStarPlanner:
                     h = math.hypot(goal[0]-nxt[0], goal[1]-nxt[1])
                     heappush(queue, (new_g + h, 0, nxt, path + [nxt]))
         return None
+    
+
+    '''
+    Use two-pointers to check if a direct line of sight exists between non-adjacent
+    waypoints using Bresenham's line algorithm, removing unnecessary intermediate waypoints.
+    '''
+    # ============= Path Smoothing with Line of Sight =============
+    def smooth_path(self, grid: OccupancyGrid, path: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
+        if len(path) <= 2: return path # nothing to smooth
+
+        smoothed = [path[0]]
+        i, n = 0, len(path)
+        # two-pointer approach to skip as many waypoints as possible
+        while i < n - 1:
+            j = n - 1 
+            
+            while j > i and not self._line_of_sight(grid, path[i], path[j]):
+                j -= 1
+
+            if j == i:
+                i += 1
+                smoothed.append(path[i])
+            else:
+                smoothed.append(path[j])
+                i = j
+
+        return smoothed
+    
+    # ============= Bresenham's line algorithm for line of sight =============
+    # -> separated for readability
+    def _line_of_sight(self, grid: OccupancyGrid, p1: Tuple[int, int],  p2: Tuple[int, int]) -> bool:
+        r0, c0 = p1
+        r1, c1 = p2
+        
+        dr = abs(r1 - r0) # delta row
+        dc = abs(c1 - c0) # delta column
+        sr = 1 if r0 < r1 else -1 # step row
+        sc = 1 if c0 < c1 else -1 # step column
+        err = dr - dc
+        
+        r, c = r0, c0
+        
+        while True:
+            if not grid.is_free(r, c):
+                return False
+            
+            if r == r1 and c == c1:
+                return True
+            
+            e2 = 2 * err
+            if e2 > -dc:
+                err -= dc
+                r += sr
+            if e2 < dr:
+                err += dr
+                c += sc
