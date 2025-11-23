@@ -1,37 +1,25 @@
 from controller import Robot
 import math, os, sys
 
-''''
-SimpleNavigator class uses A* to plan a path on an occupancy grid.
-- main loop gets robot's pose & uses the navigator (global_pplanner) to plan/replan paths to waypoints.
-- wheel speeds are adjusted based on angle to next waypoint using a proportional controller.
-- robot moves towards each waypoint in sequence, replanning as needed to account for drift.
-'''
-# ----- allow importing ../lib_shared -----------------------------------------
+# --- SETUP ---
 THIS_DIR = os.path.dirname(__file__)
-CTRL_DIR = os.path.dirname(THIS_DIR)
-if CTRL_DIR not in sys.path:
-    sys.path.append(CTRL_DIR)
+if os.path.dirname(THIS_DIR) not in sys.path: sys.path.append(os.path.dirname(THIS_DIR))
 
 from lib_shared.global_planner import AStarPlanner
-from lib_shared.map_module import visualise_robot_on_map, check_map_alignment, get_map
+from lib_shared.map_module import visualise_robot_on_map, get_map
+from lib_shared.local_planner import DWA
 
-LEFT_MOTOR = 'left wheel motor'
-RIGHT_MOTOR = 'right wheel motor'
-LIDAR_NAME = 'LDS-01'
-IMU_NAME = 'inertial unit'
-COMPASS_NAME = 'compass'
-GPS_NAME = 'gps'
+LEFT_MOTOR, RIGHT_MOTOR = 'left wheel motor', 'right wheel motor'
+LIDAR_NAME, IMU_NAME, COMPASS_NAME, GPS_NAME = 'LDS-01', 'inertial unit', 'compass', 'gps'
+WHEEL_RADIUS, AXLE_LENGTH = 0.033, 0.16
 
-WHEEL_RADIUS = 0.033
-AXLE_LENGTH = 0.16
-
+# Params
 WAYPOINT_TOLERANCE = 0.2
-REPLAN_INTERVAL = 0.1 # Replan often to correct drift
-REPLAN_DISTANCE = 0.1
-LOOKAHEAD = 2
+REPLAN_INTERVAL = 0.5
+LOOKAHEAD = 1
+VIS_INTERVAL = 0.5
 
-# yaw = rotation around vertical axis
+# Helpers
 def get_yaw(imu, compass):
     if imu:
         r, p, y = imu.getRollPitchYaw()
@@ -41,189 +29,140 @@ def get_yaw(imu, compass):
         return math.atan2(n[0], n[2])
     return 0.0
 
-class SimpleNavigator:
-    def __init__(self, occupancy_grid):
-        self.grid = occupancy_grid
-        # [FIX 1] Increased radius to 1. 
-        # radius=0 treated robot as a dot. radius=1 gives a safety buffer for wheels.
-        self.inflated_grid = self.grid.inflate(radius=1) 
+def process_lidar(lidar, max_range=3.5):
+    ranges = lidar.getRangeImage()
+    points = []
+    n = len(ranges)
+    fov = 2 * math.pi
+    for i, r in enumerate(ranges):
+        if r == float('inf') or r > max_range or r < 0.1: continue
+        angle = -fov/2 + (i / (n - 1)) * fov
+        lx = r * math.cos(angle)
+        ly = r * math.sin(angle)
+        points.append((lx, ly))
+    return points
+
+class Navigator:
+    def __init__(self, grid):
+        self.grid = grid
+        self.plan_grid = grid.inflate(robot_radius=0.2)
         self.astar = AStarPlanner()
-        self.global_path = [] 
-        self.global_path_world = [] 
-        self.current_wp_idx = 0 
-        self.last_replan_time = -100.0 
+        self.path_world = []
+        self.idx = 0
 
-    def plan_path(self, start_x, start_z, goal_x, goal_z):
-        grid_to_plan = self.inflated_grid
-        start_grid = grid_to_plan.world_to_grid(start_x, start_z)
-        goal_grid = grid_to_plan.world_to_grid(goal_x, goal_z)
+    def plan(self, sx, sz, gx, gz):
+        s_grid = self.plan_grid.world_to_grid(sx, sz)
+        g_grid = self.plan_grid.world_to_grid(gx, gz)
+        
+        print(f"[Nav] Plan request: World({sx:.2f},{sz:.2f}) -> Grid{s_grid}")
+        
+        safe_start = s_grid
+        actual_start = s_grid
+        if not self.plan_grid.is_free(*s_grid):
+            safe_start = self._bfs_free(s_grid)
+            if not safe_start: 
+                print(f"[Nav] Blocked start {s_grid}. No escape."); return False
+            print(f"[Nav] Relocated start to {safe_start}")
 
-        if not grid_to_plan.is_free(*start_grid):
-            print(f"[Nav] Start blocked. Finding free cell...")
-            start_grid = self._find_free(start_grid, grid=grid_to_plan)
-            if not start_grid: return False
+        safe_goal = g_grid
+        if not self.plan_grid.is_free(*g_grid):
+            safe_goal = self._bfs_free(g_grid)
+            if not safe_goal: return False
 
-        if not grid_to_plan.is_free(*goal_grid):
-            print(f"[Nav] Goal blocked. Finding free cell...")
-            goal_grid = self._find_free(goal_grid, grid=grid_to_plan)
-            if not goal_grid: return False
-
-        path = self.astar.plan(grid_to_plan, start_grid, goal_grid)
-        if not path:
-            print("[Nav] No path found!")
-            return False
-
-        self.global_path = path
-        self.global_path_world = [self.grid.grid_to_world(r, c) for r, c in path]
-        self.current_wp_idx = 0
+        path_indices = self.astar.plan(self.plan_grid, safe_start, safe_goal)
+        if not path_indices: return False
+        
+        if actual_start != safe_start: path_indices.insert(0, actual_start)
+        
+        self.path_world = [self.grid.grid_to_world(r, c) for r, c in path_indices]
+        self.idx = 0
         return True
 
-    def _find_free(self, pos, radius=8, grid=None):
-        if grid is None: grid = self.grid
-        r, c = pos
-        for d in range(1, radius + 1):
-            for dr in range(-d, d + 1):
-                for dc in range(-d, d + 1):
-                    if abs(dr) != d and abs(dc) != d: continue 
-                    nr, nc = r + dr, c + dc
-                    if grid.is_free(nr, nc): return (nr, nc)
+    def _bfs_free(self, start, max_dist=8):
+        for d in range(1, max_dist+1):
+            for r in range(start[0]-d, start[0]+d+1):
+                for c in range(start[1]-d, start[1]+d+1):
+                    if self.plan_grid.is_free(r, c): return (r, c)
         return None
 
-    def should_replan(self, robot_x, robot_z, time):
-        if not self.global_path_world: return False
-        if time - self.last_replan_time < REPLAN_INTERVAL: return False
-        if self.current_wp_idx < len(self.global_path_world):
-             wx, wz = self.global_path_world[self.current_wp_idx]
-             dist = math.hypot(wx - robot_x, wz - robot_z)
-             if dist > REPLAN_DISTANCE: return True
-        return False
-
-    def get_next_waypoint(self, robot_x, robot_z):
-        if not self.global_path_world: return None
-        while self.current_wp_idx < len(self.global_path_world):
-            wx, wz = self.global_path_world[self.current_wp_idx]
-            dist = math.hypot(wx - robot_x, wz - robot_z)
-            if dist < WAYPOINT_TOLERANCE:
-                self.current_wp_idx += 1
-            else:
-                break
-        if self.current_wp_idx >= len(self.global_path_world): return None
-        lookahead_idx = min(self.current_wp_idx + LOOKAHEAD, len(self.global_path_world) - 1)
-        return self.global_path_world[lookahead_idx]
-
-    def get_progress(self):
-        if not self.global_path: return 0.0
-        return 100.0 * self.current_wp_idx / len(self.global_path)
+    def get_target(self, rx, rz):
+        if not self.path_world: return None
+        while self.idx < len(self.path_world):
+            wx, wz = self.path_world[self.idx]
+            if math.hypot(wx-rx, wz-rz) < WAYPOINT_TOLERANCE: self.idx += 1
+            else: break
+        if self.idx >= len(self.path_world): return None
+        return self.path_world[min(self.idx + LOOKAHEAD, len(self.path_world)-1)]
 
 def main():
     robot = Robot()
     ts = int(robot.getBasicTimeStep())
-
-    lm = robot.getDevice(LEFT_MOTOR)
-    rm = robot.getDevice(RIGHT_MOTOR)
-    lm.setPosition(float('inf'))
-    rm.setPosition(float('inf'))
-    lm.setVelocity(0.0)
-    rm.setVelocity(0.0)
-
-    imu = robot.getDevice(IMU_NAME)
-    if imu: imu.enable(ts) 
-    compass = robot.getDevice(COMPASS_NAME)
-    if compass: compass.enable(ts) 
-    gps = robot.getDevice(GPS_NAME)
-    gps.enable(ts)
     
-    grid = get_map()
-    check_map_alignment(grid)
-    navigator = SimpleNavigator(grid)
+    gps = robot.getDevice(GPS_NAME); gps.enable(ts)
+    imu = robot.getDevice(IMU_NAME); imu.enable(ts)
+    compass = robot.getDevice(COMPASS_NAME); compass.enable(ts)
+    lidar = robot.getDevice(LIDAR_NAME); lidar.enable(ts); lidar.enablePointCloud()
+    
+    lm = robot.getDevice(LEFT_MOTOR); lm.setPosition(float('inf')); lm.setVelocity(0)
+    rm = robot.getDevice(RIGHT_MOTOR); rm.setPosition(float('inf')); rm.setVelocity(0)
 
-    V_MAX = 0.3 
-    W_MAX = 2.5          
-    KP_TURN = 2.0 
+    grid = get_map(verbose=True)
+    nav = Navigator(grid)
+    dwa = DWA()
     
-    BRAKING_DISTANCE = 1 # Start slowing down 1m from final goal
-    MIN_SPEED = 0.01       # Keep moving enough to reach the tolerance zone
-    
-    MISSION = [(3.5, 3.0, "Goal 1")]
-    mission_idx = 0
+    MISSIONS = [(5.5, 1.6), (3.5, 3.5)]
+    m_idx = 0
     path_planned = False
+    last_vis = 0.0
+    last_replan = 0.0
+    prev_cmd = (0.0, 0.0)
 
-    # ------ Main control loop ------
+    print("Starting Loop...")
+    
     while robot.step(ts) != -1:
         now = robot.getTime()
-        x, _, z = gps.getValues()
+        if now < 1.0: continue 
+        
+        rx, rz = gps.getValues()[0], gps.getValues()[1]
         yaw = get_yaw(imu, compass)
 
+        # Visualise
+        if now - last_vis > VIS_INTERVAL:
+            path_idx = [grid.world_to_grid(wx, wz) for wx, wz in nav.path_world]
+            visualise_robot_on_map(grid, rx, rz, yaw, path=path_idx)
+            last_vis = now
+
+        # Plan
         if not path_planned:
-            if mission_idx >= len(MISSION):
-                lm.setVelocity(0.0)
-                rm.setVelocity(0.0)
-                print("Mission Complete")
-                break
-            goal_x, goal_z, _ = MISSION[mission_idx]
-            if navigator.plan_path(x, z, goal_x, goal_z):
-                path_planned = True
-                navigator.last_replan_time = now
-                visualise_robot_on_map(grid, x, z, yaw, goal_x, goal_z, navigator.global_path)
-            else:
-                mission_idx += 1
-                continue
+            if m_idx >= len(MISSIONS): lm.setVelocity(0); rm.setVelocity(0); print("Done!"); break
+            gx, gz = MISSIONS[m_idx]
+            if nav.plan(rx, rz, gx, gz): path_planned = True; last_replan = now
+            else: print("Plan failed, skipping"); m_idx += 1; continue
 
-        if navigator.should_replan(x, z, now):
-            goal_x, goal_z, _ = MISSION[mission_idx]
-            if navigator.plan_path(x, z, goal_x, goal_z):
-                navigator.last_replan_time = now
+        # Replan
+        if now - last_replan > REPLAN_INTERVAL:
+             gx, gz = MISSIONS[m_idx]
+             if nav.plan(rx, rz, gx, gz): last_replan = now
 
-        navigator.get_progress()
-        waypoint = navigator.get_next_waypoint(x, z)
-        
-        if waypoint is None:
-            mission_idx += 1
-            path_planned = False
-            lm.setVelocity(0.0)
-            rm.setVelocity(0.0)
-            continue
-
-        # Steering by adjusting wheel speed ratio
-        dx = waypoint[0] - x
-        dz = waypoint[1] - z
-        dist = math.hypot(dx, dz) # [FIX 3] Calculate exact distance for control
-        
-        target_angle = math.atan2(-dz, dx) 
-        
-        error = target_angle - yaw
-        while error > math.pi: error -= 2 * math.pi
-        while error < -math.pi: error += 2 * math.pi
-
-        w = KP_TURN * error
-        
-        # Base speed: slow down if turning sharply
-        v = V_MAX * max(0.0, 1.0 - abs(error) / 0.5) 
-
-        # Braking Ramp Logic - if target waypoint is FINAL in path, brake as approaching
-        is_final_leg = (waypoint == navigator.global_path_world[-1])
-        if is_final_leg and dist < BRAKING_DISTANCE:
-            ramp_factor = dist / BRAKING_DISTANCE
-            v = v * ramp_factor
+        # Execute
+        target = nav.get_target(rx, rz)
+        if not target: print("Waypoint reached"); m_idx += 1; path_planned = False; lm.setVelocity(0); rm.setVelocity(0); continue
             
-            # Ensure we don't stall completely before reaching WAYPOINT_TOLERANCE (0.2)
-            if v < MIN_SPEED: v = MIN_SPEED
-
-        v = max(0.0, min(V_MAX, v))
-        w = max(-W_MAX, min(W_MAX, w))
-
-        wl = (v - 0.5 * w * AXLE_LENGTH) / WHEEL_RADIUS
-        wr = (v + 0.5 * w * AXLE_LENGTH) / WHEEL_RADIUS
+        tx, ty = target
+        dx_world, dy_world = tx - rx, ty - rz
+        gx = dx_world * math.cos(-yaw) - dy_world * math.sin(-yaw)
+        gy = dx_world * math.sin(-yaw) + dy_world * math.cos(-yaw)
         
-        max_wheel_v = min(lm.getMaxVelocity(), rm.getMaxVelocity())
-        wl = max(-max_wheel_v, min(max_wheel_v, wl))
-        wr = max(-max_wheel_v, min(max_wheel_v, wr))
+        v, w = dwa.get_safe_velocities(process_lidar(lidar), (gx, gy), prev_cmd, prev_cmd)
+        prev_cmd = (v, w)
 
-        lm.setVelocity(wl)
-        rm.setVelocity(wr)
-
-        if int(now) % 2 == 0:
-            visualise_robot_on_map(grid, x, z, yaw, MISSION[mission_idx][0], MISSION[mission_idx][1], navigator.global_path)
+        w_act = -w # Flip if needed
+        wl = (v - w_act * AXLE_LENGTH * 0.5) / WHEEL_RADIUS
+        wr = (v + w_act * AXLE_LENGTH * 0.5) / WHEEL_RADIUS
+        
+        limit = 6.0
+        lm.setVelocity(max(-limit, min(limit, wl)))
+        rm.setVelocity(max(-limit, min(limit, wr)))
 
 if __name__ == "__main__":
     main()
