@@ -34,8 +34,7 @@ except Exception as e:
 # Main Loop
 while robot.step(timestep) != -1:
     if camera:
-        trash_spotted = vision.is_trash_visible(camera)
-
-        print(f"Vision library check: {trash_spotted}")
+        if vision.is_trash_visible(camera):
+            print(f"Vision library check: Found Trash!!")
     else:
         print("Camera not found, cannot run vision check.")

@@ -7,7 +7,7 @@ def is_trash_visible(camera):
     """
     image_data = camera.getImageArray()
     
-    # Robustness Check & Get Real Dimensions ---
+    # Camera Check & Get Real Dimensions ---
     try:
         actual_height = len(image_data)
         actual_width = len(image_data[0])
