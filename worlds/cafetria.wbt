@@ -20,6 +20,7 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/chairs/protos/Chair.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/robotis/turtlebot/protos/TurtleBot3Burger.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/devices/robotis/protos/RobotisLds01.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
 
 WorldInfo {
   info [
@@ -55,6 +56,7 @@ Floor {
   }
 }
 TurtleBot3Burger {
+<<<<<<< HEAD
   hidden position_0_0 122.00280171692275
   hidden position_0_1 104.56547084855572
   hidden position_0_2 -296.7685122614073
@@ -68,6 +70,10 @@ TurtleBot3Burger {
   hidden rotation_12 0.18011534634251442 -0.907393164086422 0.3797316259954488 1.8213387859334635
   translation 1.3854447554473293e-08 3.3136072129453034e-09 -0.00024499194739356633
   rotation 0.00128621996526451 -0.2896541590851825 0.9571305103082111 0.016125897693983413
+=======
+  translation 0.5378285984115962 2.4787194261605188 -0.000245001133713757
+  rotation -0.0031405221301282335 -0.28118629919231825 -0.9596480616701512 0.016430590782649832
+>>>>>>> 5258ca50bacddcfa4771939e75fd4c18b07486af
   controller "a_star_test"
   extensionSlot [
     RobotisLds01 {
@@ -79,6 +85,7 @@ TurtleBot3Burger {
   ]
 }
 TurtleBot3Burger {
+<<<<<<< HEAD
   hidden position_0_0 56.60135982397557
   hidden position_0_1 48.882477135315284
   hidden position_0_2 47.209202056276276
@@ -89,6 +96,10 @@ TurtleBot3Burger {
   hidden rotation_11 -0.02257892995709633 -0.9938493681037583 0.10841413856943467 1.1036555867273863
   translation 3.499999999998052 1.9290800000108128 -0.00024773920380569137
   rotation 0.002280431733588582 -0.01907010654248258 0.9998155483225728 0.2422848478475117
+=======
+  translation 3.4999999999979106 1.9290800000124475 -0.00024773920358473617
+  rotation 0.002280431887621253 -0.019070106535484528 0.999815548322355 0.2422848478470754
+>>>>>>> 5258ca50bacddcfa4771939e75fd4c18b07486af
   name "HumanAgent"
   extensionSlot [
     GPS {
@@ -411,8 +422,11 @@ Wall {
   size 0.06 6.2 2.5
 }
 Door {
+<<<<<<< HEAD
   hidden translation_5 0.0015677760428477738 4.627581079641452e-05 5.551115123125783e-16
   hidden rotation_5 0 0 -1 0.0011952596184609198
+=======
+>>>>>>> 5258ca50bacddcfa4771939e75fd4c18b07486af
   translation 0 4.8 0
   rotation 0 0 -1 1.5708
   size 0.06 1 2.5
@@ -436,10 +450,13 @@ PottedTree {
   name "potted tree(1)"
 }
 Cabinet {
+<<<<<<< HEAD
   hidden position_6_0 -4.988359632497783e-41
   hidden position_14_0 -4.988359632072736e-41
   hidden position_22_0 -4.988359631980805e-41
   hidden position_30_0 -4.988359631489102e-41
+=======
+>>>>>>> 5258ca50bacddcfa4771939e75fd4c18b07486af
   translation 6.65 -0.7 1.6
   rotation 0 0 1 3.14159
   name "cabinet(2)"
@@ -605,4 +622,8 @@ Table {
   legAppearance MattePaint {
     baseColor 0.2 0.2 0.2
   }
+}
+E-puck {
+  controller "spotter"
+  window "<none>"
 }
