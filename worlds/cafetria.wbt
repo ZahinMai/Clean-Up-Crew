@@ -21,6 +21,7 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/robotis/turtlebot/protos/TurtleBot3Burger.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/devices/robotis/protos/RobotisLds01.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/devices/hokuyo/protos/HokuyoUrg04lx.proto"
 
 WorldInfo {
   info [
@@ -32,8 +33,9 @@ WorldInfo {
   title "cafeteria"
 }
 Viewpoint {
-  orientation 0.09014857565980677 -0.9914085334494019 -0.09477528216900255 4.753766366058731
-  position -1.424344861591543 1.2078895354369767 20.5764845935134
+  orientation 0.5357864247315556 0.5776847143765709 -0.6158029537514718 1.9693365673905385
+  position -0.5672824557373168 4.36069498555518 28.676080751488136
+  follow "e-puck"
 }
 TexturedBackground {
   texture "entrance_hall"
@@ -583,6 +585,17 @@ Table {
   }
 }
 E-puck {
+  translation -5.7 -2.5 0
   controller "spotter"
   window "<none>"
+  turretSlot [
+    Compass {
+    }
+    GPS {
+    }
+    HokuyoUrg04lx {
+      name "lidar"
+      enablePhysics FALSE
+    }
+  ]
 }
