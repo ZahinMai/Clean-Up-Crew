@@ -3,15 +3,16 @@ import math, os, sys
 from collections import deque
 from typing import Optional, Tuple, List
 
-# So I can import lib_shared
+# ---- So I can import lib_shared ---- #
 THIS_DIR = os.path.dirname(__file__)
 PARENT_DIR = os.path.dirname(THIS_DIR)
 if PARENT_DIR not in sys.path:
     sys.path.insert(0, PARENT_DIR)
+# ----------------------------------- #
 
 from lib_shared.global_planner import AStarPlanner
 from lib_shared.map_module import visualise_robot_on_map, get_map
-from controllers.lib_shared.adapted_dwa import DWA, _ang
+from lib_shared.local_planner import DWA, _ang
 
 # Devices & physical constants
 LEFT_MOTOR, RIGHT_MOTOR = 'left wheel motor', 'right wheel motor'
@@ -23,48 +24,92 @@ WAYPOINT_TOLERANCE = 0.2
 REPLAN_INTERVAL = 0.5
 LOOKAHEAD = 1
 VIS_INTERVAL = 0.5
-DWA_ENABLED = False # TURNED OFF BECAUSE IT DOESN"T WORK WELL RN
+DWA_ENABLED = True # TURNED OFF BECAUSE IT DOESN"T WORK WELL RN
 
 # DWA custom config (overrides dwa module defaults)
 dwa_config = {
-    'DT_SIM': 0.05,
-    'T_PRED': 1.5,
+    'DT_SIM': 0.5, # lower sim dt for faster computation
+    'T_PRED': 1.5, # shorter prediction horizon for faster computation
     'V_MAX': 0.35,
     'W_MAX': 2.0,
     'ACC_V': 1.0,
     'ACC_W': 2.0,
     'RADIUS': 0.09,
     'SAFE': 0.05,
-    'NV': 5,
-    'NW': 11,
-    'LIDAR_SKIP': 5,
-    'W_HEAD': 0.8,
+    'NV': 5, # fewer velocity samples
+    'NW': 11, # fewer angular velocity samples
+    'LIDAR_SKIP': 5, # skip lidar points for faster computation
+    'W_HEAD': 0.8, 
     'W_CLEAR': 0.2,
     'W_VEL': 0.2,
 }
 
-def get_yaw(imu, compass) -> float:
+def _nav_get_yaw(imu, compass) -> float:
+    """Simplified yaw helper (radians). Prefer IMU, then compass, else 0.0."""
     if imu:
-        _, _, yaw = imu.getRollPitchYaw()
-        return yaw
+        try:
+            return float(imu.getRollPitchYaw()[2])
+        except Exception:
+            pass
     if compass:
-        c = compass.getValues()
-        return math.atan2(c[0], c[2])
+        try:
+            c = compass.getValues()
+            return math.atan2(c[0], c[2])
+        except Exception:
+            pass
     return 0.0
 
-def process_lidar(lidar, max_range: float = 3.5) -> List[Tuple[float, float]]:
-    ranges = lidar.getRangeImage()
-    points = []
+
+def _nav_process_lidar(lidar, max_range: float = 3.5, min_range: float = 0.1) -> List[Tuple[float, float]]:
+    """Simplified lidar processing: returns (x, y) points in robot frame."""
+    points: List[Tuple[float, float]] = []
+    if not lidar:
+        return points
+    try:
+        ranges = lidar.getRangeImage()
+    except Exception:
+        return points
     if not ranges:
         return points
+
     n = len(ranges)
-    fov = 2 * math.pi
+    if n == 0:
+        return points
+
+    # Prefer device-provided FOV if available; else assume full circle.
+    try:
+        fov = float(lidar.getFov())
+        if fov <= 0:
+            fov = 2 * math.pi
+    except Exception:
+        fov = 2 * math.pi
+
+    # Compute angle for each point and filter by range
     for i, r in enumerate(ranges):
-        if r == float('inf') or r > max_range or r < 0.1:
+        if not math.isfinite(r) or r > max_range or r < min_range:
             continue
-        angle = -fov / 2 + (i / (n - 1)) * fov
+        angle = -fov / 2 + (i / (n - 1)) * fov if n > 1 else 0.0
         points.append((r * math.cos(angle), r * math.sin(angle)))
     return points
+
+
+def _attach_nav_helpers(cls):
+    """Decorator to attach the helpers onto the Navigator class as staticmethods."""
+    cls.get_yaw = staticmethod(_nav_get_yaw)
+    cls.process_lidar = staticmethod(_nav_process_lidar)
+    return cls
+
+
+# Keep legacy global wrappers for backward compatibility (main currently calls them).
+def get_yaw(imu, compass) -> float:
+    return _nav_get_yaw(imu, compass)
+
+
+def process_lidar(lidar, max_range: float = 3.5, min_range: float = 0.1) -> List[Tuple[float, float]]:
+    return _nav_process_lidar(lidar, max_range, min_range)
+
+
+@_attach_nav_helpers
 
 
 class Navigator:
@@ -176,9 +221,9 @@ def main():
     wheel_limit = min(lm.getMaxVelocity(), rm.getMaxVelocity())
     robot_v_max = wheel_limit * WHEEL_RADIUS
     robot_w_max = wheel_limit * WHEEL_RADIUS * 2.0 / AXLE_LENGTH
-    dwa = DWA(config=dwa_config)
+    dwa = DWA(params=dwa_config)
 
-    MISSIONS = [(5.5, 1.6), (3.5, 3.5)]
+    MISSIONS = [(5.5, 1.6), (3.5, 2.0)]
     m_idx = 0
     path_planned = False
     last_vis = last_replan = 0.0
