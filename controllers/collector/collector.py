@@ -21,7 +21,7 @@ WHEEL_RADIUS, AXLE_LENGTH = 0.033, 0.16
 
 # Behavioral constants
 WAYPOINT_TOLERANCE = 0.2
-REPLAN_INTERVAL = 0.5
+REPLAN_INTERVAL = 1.0
 LOOKAHEAD = 1
 VIS_INTERVAL = 0.5
 DWA_ENABLED = True # TURNED OFF BECAUSE IT DOESN"T WORK WELL RN
@@ -38,39 +38,30 @@ dwa_config = {
     'SAFE': 0.05,
     'NV': 5, # fewer velocity samples
     'NW': 11, # fewer angular velocity samples
-    'LIDAR_SKIP': 5, # skip lidar points for faster computation
+    'LIDAR_SKIP': 4, # skip lidar points for faster computation
     'W_HEAD': 0.8, 
     'W_CLEAR': 0.2,
     'W_VEL': 0.2,
 }
 
-def _nav_get_yaw(imu, compass) -> float:
-    """Simplified yaw helper (radians). Prefer IMU, then compass, else 0.0."""
+def get_yaw(imu, compass) -> float:
     if imu:
-        try:
-            return float(imu.getRollPitchYaw()[2])
-        except Exception:
-            pass
+        try: return float(imu.getRollPitchYaw()[2])
+        except Exception:pass
     if compass:
         try:
             c = compass.getValues()
             return math.atan2(c[0], c[2])
-        except Exception:
-            pass
+        except Exception: pass
     return 0.0
 
 
-def _nav_process_lidar(lidar, max_range: float = 3.5, min_range: float = 0.1) -> List[Tuple[float, float]]:
-    """Simplified lidar processing: returns (x, y) points in robot frame."""
+def process_lidar(lidar, max_range: float = 3.5, min_range: float = 0.1) -> List[Tuple[float, float]]:
     points: List[Tuple[float, float]] = []
-    if not lidar:
-        return points
-    try:
-        ranges = lidar.getRangeImage()
-    except Exception:
-        return points
-    if not ranges:
-        return points
+    if not lidar: return points
+    try:ranges = lidar.getRangeImage()
+    except Exception: return points
+    if not ranges:return points
 
     n = len(ranges)
     if n == 0:
@@ -93,23 +84,7 @@ def _nav_process_lidar(lidar, max_range: float = 3.5, min_range: float = 0.1) ->
     return points
 
 
-def _attach_nav_helpers(cls):
-    """Decorator to attach the helpers onto the Navigator class as staticmethods."""
-    cls.get_yaw = staticmethod(_nav_get_yaw)
-    cls.process_lidar = staticmethod(_nav_process_lidar)
-    return cls
 
-
-# Keep legacy global wrappers for backward compatibility (main currently calls them).
-def get_yaw(imu, compass) -> float:
-    return _nav_get_yaw(imu, compass)
-
-
-def process_lidar(lidar, max_range: float = 3.5, min_range: float = 0.1) -> List[Tuple[float, float]]:
-    return _nav_process_lidar(lidar, max_range, min_range)
-
-
-@_attach_nav_helpers
 
 
 class Navigator:
