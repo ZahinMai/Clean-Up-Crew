@@ -1,175 +1,258 @@
 from controller import Robot
 import math, os, sys
+from collections import deque
+from typing import Optional, Tuple, List
 
-# --- So I can import from lib_shared ---
+# So I can import lib_shared
 THIS_DIR = os.path.dirname(__file__)
-if os.path.dirname(THIS_DIR) not in sys.path: sys.path.append(os.path.dirname(THIS_DIR))
-# --------------------------------------
+PARENT_DIR = os.path.dirname(THIS_DIR)
+if PARENT_DIR not in sys.path:
+    sys.path.insert(0, PARENT_DIR)
 
 from lib_shared.global_planner import AStarPlanner
 from lib_shared.map_module import visualise_robot_on_map, get_map
-from lib_shared.local_planner import DWA
+from controllers.lib_shared.adapted_dwa import DWA, _ang
 
-# --- Constants ---
+# Devices & physical constants
 LEFT_MOTOR, RIGHT_MOTOR = 'left wheel motor', 'right wheel motor'
 LIDAR_NAME, IMU_NAME, COMPASS_NAME, GPS_NAME = 'LDS-01', 'inertial unit', 'compass', 'gps'
-WHEEL_RADIUS, AXLE_LENGTH = 0.033, 0.16 # from Webots docs
+WHEEL_RADIUS, AXLE_LENGTH = 0.033, 0.16
 
-WAYPOINT_TOLERANCE = 0.2 # how close to waypoint to consider reached
-REPLAN_INTERVAL = 0.5 # replan often to account for drift
-LOOKAHEAD = 1 # waypoints ahead to target - help smooth turns
-VIS_INTERVAL = 0.5 # seconds between map visualisations in console (debug)
+# Behavioral constants
+WAYPOINT_TOLERANCE = 0.2
+REPLAN_INTERVAL = 0.5
+LOOKAHEAD = 1
+VIS_INTERVAL = 0.5
+DWA_ENABLED = False # TURNED OFF BECAUSE IT DOESN"T WORK WELL RN
 
-# --- Helper functions (for imu & lidar) ---
-def get_yaw(imu, compass): # yaw is the angle around the vertical axis
+# DWA custom config (overrides dwa module defaults)
+dwa_config = {
+    'DT_SIM': 0.05,
+    'T_PRED': 1.5,
+    'V_MAX': 0.35,
+    'W_MAX': 2.0,
+    'ACC_V': 1.0,
+    'ACC_W': 2.0,
+    'RADIUS': 0.09,
+    'SAFE': 0.05,
+    'NV': 5,
+    'NW': 11,
+    'LIDAR_SKIP': 5,
+    'W_HEAD': 0.8,
+    'W_CLEAR': 0.2,
+    'W_VEL': 0.2,
+}
+
+def get_yaw(imu, compass) -> float:
     if imu:
-        _, _, y = imu.getRollPitchYaw()
-        return y
+        _, _, yaw = imu.getRollPitchYaw()
+        return yaw
     if compass:
-        n = compass.getValues()
-        return math.atan2(n[0], n[2])
+        c = compass.getValues()
+        return math.atan2(c[0], c[2])
     return 0.0
 
-def process_lidar(lidar, max_range=3.5):
+def process_lidar(lidar, max_range: float = 3.5) -> List[Tuple[float, float]]:
     ranges = lidar.getRangeImage()
     points = []
+    if not ranges:
+        return points
     n = len(ranges)
     fov = 2 * math.pi
     for i, r in enumerate(ranges):
-        if r == float('inf') or r > max_range or r < 0.1: continue
-        angle = -fov/2 + (i / (n - 1)) * fov
-        lx = r * math.cos(angle)
-        ly = r * math.sin(angle)
-        points.append((lx, ly))
+        if r == float('inf') or r > max_range or r < 0.1:
+            continue
+        angle = -fov / 2 + (i / (n - 1)) * fov
+        points.append((r * math.cos(angle), r * math.sin(angle)))
     return points
+
 
 class Navigator:
     def __init__(self, grid):
         self.grid = grid
-        self.plan_grid = grid.inflate(0) # no inflation for now
+        self.plan_grid = grid.inflate(0)
         self.astar = AStarPlanner()
-        self.path_world = []
+        self.path_world: List[Tuple[float, float]] = []
         self.idx = 0
 
-    def plan(self, sx, sz, gx, gz):
-        # Convert world to grid coordinates for planning
+    def plan(self, sx: float, sz: float, gx: float, gz: float) -> bool:
         s_grid = self.plan_grid.world_to_grid(sx, sz)
         g_grid = self.plan_grid.world_to_grid(gx, gz)
-        
-        print(f"[Nav] Plan request: World({sx:.2f},{sz:.2f}) -> Grid{s_grid}")
-        
-        # Check if start is free, relocate if blocked
-        safe_start = s_grid if self.plan_grid.is_free(*s_grid) else self._bfs_free(s_grid)
-        
-        if not safe_start: # Can't relocate start -> give up
-            print(f"[Nav] Blocked start {s_grid}. No escape.")
-            return False 
-        
-        if safe_start != s_grid: # Log relocation
-            print(f"[Nav] Relocated start to {safe_start}")
 
-        # Check if goal is free, relocate if blocked
-        safe_goal = g_grid if self.plan_grid.is_free(*g_grid) else self._bfs_free(g_grid)
-        
-        if not safe_goal: # Can't relocate goal -> give up
-            print(f"[Nav] Blocked goal {g_grid}. No escape.")
-            return False 
+        start = s_grid if self._is_free(s_grid) else self._bfs_free(s_grid)
+        if start is None:
+            return False
 
-        # Plan the path
-        path_indices = self.astar.plan(self.plan_grid, safe_start, safe_goal)
+        goal = g_grid if self._is_free(g_grid) else self._bfs_free(g_grid)
+        if goal is None:
+            return False
+
+        path_indices = self.astar.plan(self.plan_grid, start, goal)
         if not path_indices:
-            print("[Nav] No path found.")
-            return False 
+            return False
 
         self.path_world = [self.grid.grid_to_world(r, c) for r, c in path_indices]
-        self.idx = 0 # reset waypoint index
+        self.idx = 0
         return True
 
-    # to quickly find nearest free cell
-    def _bfs_free(self, start, max_dist=8):
-        for d in range(1, max_dist+1):
-            for r in range(start[0]-d, start[0]+d+1):
-                for c in range(start[1]-d, start[1]+d+1):
-                    if self.plan_grid.is_free(r, c): return (r, c)
+    def _is_free(self, idx: Tuple[int, int]) -> bool:
+        try:
+            return self.plan_grid.is_free(*idx)
+        except Exception:
+            return False
+
+    def _bfs_free(self, start: Tuple[int, int], max_dist: int = 8) -> Optional[Tuple[int, int]]:
+        q = deque([start])
+        seen = {start}
+        dist = 0
+        while q and dist <= max_dist:
+            for _ in range(len(q)):
+                r, c = q.popleft()
+                if self._is_free((r, c)):
+                    return (r, c)
+                for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nr, nc = r + dr, c + dc
+                    if (nr, nc) not in seen:
+                        seen.add((nr, nc))
+                        q.append((nr, nc))
+            dist += 1
         return None
 
-    # Get next target waypoint in world coordinates
-    def get_target(self, rx, rz):
-        if not self.path_world: return None
+    def get_target(self, rx: float, rz: float) -> Optional[Tuple[float, float]]:
+        if not self.path_world:
+            return None
         while self.idx < len(self.path_world):
             wx, wz = self.path_world[self.idx]
-            if math.hypot(wx-rx, wz-rz) < WAYPOINT_TOLERANCE: self.idx += 1
-            else: break
-        if self.idx >= len(self.path_world): return None
-        return self.path_world[min(self.idx + LOOKAHEAD, len(self.path_world)-1)]
+            if math.hypot(wx - rx, wz - rz) < WAYPOINT_TOLERANCE:
+                self.idx += 1
+            else:
+                break
+        if self.idx >= len(self.path_world):
+            return None
+        return self.path_world[min(self.idx + LOOKAHEAD, len(self.path_world) - 1)]
+
+
+def _get_device(robot: Robot, name: str, ts: int = 0, enable_pointcloud: bool = False):
+    dev = robot.getDevice(name)
+    if ts:
+        if name == LIDAR_NAME and enable_pointcloud:
+            dev.enablePointCloud()
+        dev.enable(ts)
+    return dev
+
+
+def world_to_robot(dx: float, dy: float, yaw: float) -> Tuple[float, float]:
+    cos_y, sin_y = math.cos(-yaw), math.sin(-yaw)
+    x_r = dx * cos_y - dy * sin_y
+    y_r = dx * sin_y + dy * cos_y
+    return x_r, y_r
+
+
+def wheel_velocities_from(v: float, w: float, wheel_radius: float, axle_length: float) -> Tuple[float, float]:
+    w_act = -w  # negative due to coordinate sign convention
+    wl = (v - w_act * axle_length * 0.5) / wheel_radius
+    wr = (v + w_act * axle_length * 0.5) / wheel_radius
+    return wl, wr
+
 
 def main():
     robot = Robot()
     ts = int(robot.getBasicTimeStep())
-    
-    gps = robot.getDevice(GPS_NAME); gps.enable(ts)
-    imu = robot.getDevice(IMU_NAME); imu.enable(ts)
-    compass = robot.getDevice(COMPASS_NAME); compass.enable(ts)
-    lidar = robot.getDevice(LIDAR_NAME); lidar.enable(ts); lidar.enablePointCloud()
-    
-    lm = robot.getDevice(LEFT_MOTOR); lm.setPosition(float('inf')); lm.setVelocity(0)
-    rm = robot.getDevice(RIGHT_MOTOR); rm.setPosition(float('inf')); rm.setVelocity(0)
+
+    gps = _get_device(robot, GPS_NAME, ts)
+    imu = _get_device(robot, IMU_NAME, ts)
+    compass = _get_device(robot, COMPASS_NAME, ts)
+    lidar = _get_device(robot, LIDAR_NAME, ts, enable_pointcloud=True)
+
+    lm = robot.getDevice(LEFT_MOTOR)
+    rm = robot.getDevice(RIGHT_MOTOR)
+    for m in (lm, rm):
+        m.setPosition(float('inf'))
+        m.setVelocity(0.0)
 
     grid = get_map(verbose=True)
     nav = Navigator(grid)
-    dwa = DWA()
-    
+
+    wheel_limit = min(lm.getMaxVelocity(), rm.getMaxVelocity())
+    robot_v_max = wheel_limit * WHEEL_RADIUS
+    robot_w_max = wheel_limit * WHEEL_RADIUS * 2.0 / AXLE_LENGTH
+    dwa = DWA(config=dwa_config)
+
     MISSIONS = [(5.5, 1.6), (3.5, 3.5)]
     m_idx = 0
     path_planned = False
-    last_vis = 0.0 
-    last_replan = 0.0 
-    prev_cmd = (0.0, 0.0) # this helps smooth DWA commands
-    
+    last_vis = last_replan = 0.0
+    prev_cmd = (0.0, 0.0)
+
     while robot.step(ts) != -1:
         now = robot.getTime()
-        if now < 1.0: continue 
-        
+        if now < 1.0:
+            continue
+
         rx, rz = gps.getValues()[0], gps.getValues()[1]
         yaw = get_yaw(imu, compass)
 
-        # -- Visualise
         if now - last_vis > VIS_INTERVAL:
-            path_idx = [grid.world_to_grid(wx, wz) for wx, wz in nav.path_world]
+            path_idx = [grid.world_to_grid(wx, wz) for wx, wz in nav.path_world] if nav.path_world else []
             visualise_robot_on_map(grid, rx, rz, yaw, path=path_idx)
             last_vis = now
 
-        # -- Plan
         if not path_planned:
-            if m_idx >= len(MISSIONS): lm.setVelocity(0); rm.setVelocity(0); print("Done!"); break
+            if m_idx >= len(MISSIONS):
+                lm.setVelocity(0.0)
+                rm.setVelocity(0.0)
+                break
             gx, gz = MISSIONS[m_idx]
-            if nav.plan(rx, rz, gx, gz): path_planned = True; last_replan = now
-            else: print("Plan failed, skipping"); m_idx += 1; continue
+            if nav.plan(rx, rz, gx, gz):
+                path_planned = True
+                last_replan = now
+            else:
+                m_idx += 1
+                continue
 
-        # -- Replan
         if now - last_replan > REPLAN_INTERVAL:
-             gx, gz = MISSIONS[m_idx]
-             if nav.plan(rx, rz, gx, gz): last_replan = now
+            gx, gz = MISSIONS[m_idx]
+            if nav.plan(rx, rz, gx, gz):
+                last_replan = now
 
-        # -- Execute
         target = nav.get_target(rx, rz)
-        if not target: print("Waypoint reached"); m_idx += 1; path_planned = False; lm.setVelocity(0); rm.setVelocity(0); continue
-            
+        if not target:
+            m_idx += 1
+            path_planned = False
+            lm.setVelocity(0.0)
+            rm.setVelocity(0.0)
+            continue
+
         tx, ty = target
         dx_world, dy_world = tx - rx, ty - rz
-        gx = dx_world * math.cos(-yaw) - dy_world * math.sin(-yaw)
-        gy = dx_world * math.sin(-yaw) + dy_world * math.cos(-yaw)
-        
-        v, w = dwa.get_safe_velocities(process_lidar(lidar), (gx, gy), prev_cmd, prev_cmd)
+        gx_r, gy_r = world_to_robot(dx_world, dy_world, yaw)
+
+        if DWA_ENABLED:
+            v, w = dwa.get_safe_velocities(process_lidar(lidar), (gx_r, gy_r), prev_cmd, prev_cmd)
+        else:
+            # NOTE: atan2 inherently handles normalization, but _ang strictens [-pi, pi)
+            ang = _ang(math.atan2(gy_r, gx_r))
+            dist = math.hypot(gx_r, gy_r)
+            
+            K_V = 0.8 # velocity gain
+            K_W = - 1.5
+            
+            v = K_V * dist
+            w = K_W * ang
+
+            if abs(ang) > math.pi / 2: v = 0.0 # stop if target is just behind
+            
+            # bound by robot limits
+            v = max(-robot_v_max, min(robot_v_max, v))
+            w = max(-robot_w_max, min(robot_w_max, w))
+
         prev_cmd = (v, w)
 
-        w_act = -w # Flip if needed
-        wl = (v - w_act * AXLE_LENGTH * 0.5) / WHEEL_RADIUS
-        wr = (v + w_act * AXLE_LENGTH * 0.5) / WHEEL_RADIUS
-        
-        limit = 6.0
+        wl, wr = wheel_velocities_from(v, w, WHEEL_RADIUS, AXLE_LENGTH)
+        limit = min(lm.getMaxVelocity(), rm.getMaxVelocity())
         lm.setVelocity(max(-limit, min(limit, wl)))
         rm.setVelocity(max(-limit, min(limit, wr)))
+
 
 if __name__ == "__main__":
     main()
