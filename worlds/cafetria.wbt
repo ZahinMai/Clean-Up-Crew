@@ -72,6 +72,12 @@ TurtleBot3Burger {
     }
     GPS {
     }
+    Emitter {
+      channel 1
+    }
+    Receiver {
+      channel 1
+    }
   ]
 }
 TurtleBot3Burger {
