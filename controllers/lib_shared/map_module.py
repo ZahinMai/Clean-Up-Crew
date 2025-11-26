@@ -31,54 +31,51 @@ CAFETERIA_MAP = """
 ###################################
 """
 
-class MapService:
-    @staticmethod
-    def get_map() -> OccupancyGrid: 
-        return OccupancyGrid.from_string(CAFETERIA_MAP, DEFAULT_CELL_SIZE, ORIGIN)
+def get_map(robot=None, gps=None, timestep=None, force_recalibrate=False, verbose=True) -> OccupancyGrid:
+    return OccupancyGrid.from_string(CAFETERIA_MAP, DEFAULT_CELL_SIZE, ORIGIN)
 
-    @staticmethod
-    def visualise(grid: OccupancyGrid, rx: float, rz: float, yaw: float, goals: Optional[List[Tuple[float, float]]] = None, path=None):
-        r_grid = grid.world_to_grid(rx, rz)
-        path_set = set(path) if path else set()
-        angle = yaw % (2 * math.pi)
-        sector = int((angle + math.pi/8) / (math.pi/4)) % 8
-        arrows_ccw = ['→', '↗', '↑', '↖', '←', '↙', '↓', '↘']
-        arrow = arrows_ccw[sector]
+def visualise_robot_on_map(grid: OccupancyGrid, rx: float, rz: float, yaw: float, path = None):
+    r_grid = grid.world_to_grid(rx, rz)
+    
+    # Prepare Path and Heading
+    path_set = set(path) if path else set()
+    angle = yaw % (2 * math.pi)
+    sector = int((angle + math.pi/8) / (math.pi/4)) % 8
+    arrows_ccw = ['→', '↗', '↑', '↖', '←', '↙', '↓', '↘']
+    arrow = arrows_ccw[sector]
 
-        print(f"\nMap: Robot {r_grid} {arrow} | World ({rx:.2f}, {rz:.2f})")
-        
-        # Simple clamping to keep the print window valid
-        center_r = max(0, min(grid.height-1, r_grid[0]))
-        center_c = max(0, min(grid.width-1, r_grid[1]))
-        
-        start_r = max(0, center_r - 10)
-        end_r = min(grid.height, start_r + 20)
-        start_r = max(0, end_r - 20)
+    print(f"\nMap: Robot {r_grid} {arrow} | World ({rx:.2f}, {rz:.2f})")
+    
+    # Ensure robot is within bounds
+    if not grid.is_valid(r_grid[0], r_grid[1]):
+        print(f"ROBOT OUT OF BOUNDS! Grid: {r_grid}")
+        return
 
-        start_c = max(0, center_c - 17)
-        end_c = min(grid.width, start_c + 34)
-        start_c = max(0, end_c - 34)
+    # Define View Window (Simple centering around the robot)
+    VIEW_RADIUS_R = 10  # Rows
+    VIEW_RADIUS_C = 17  # Columns
 
-        # for each row print the cells as # . + →
-        for r in range(start_r, end_r):
-            line = []
-            for c in range(start_c, end_c):
-                if (r,c) == r_grid: line.append(arrow)
-                elif (r,c) in path_set: line.append('+')
-                elif grid.grid[r][c] == 1: line.append('#')
-                else: line.append('.')
-            print(f"{r:02d} {''.join(line)}") # print row index
-        
-        if not grid.is_valid(r_grid[0], r_grid[1]):
-            print(f"ROBOT OUT OF BOUNDS! Grid: {r_grid}")
-        
-def get_map(robot=None, gps=None, timestep=None, force_recalibrate=False, verbose=True):
-    return MapService.get_map()
+    center_r, center_c = r_grid
+    
+    start_r = max(0, center_r - VIEW_RADIUS_R)
+    end_r = min(grid.height, center_r + VIEW_RADIUS_R + 1)
 
-
-# for debugging/visualisation
-def visualise_robot_on_map(grid, rx, rz, yaw, gx=None, gz=None, path=None):
-    MapService.visualise(grid, rx, rz, yaw, path=path)
+    start_c = max(0, center_c - VIEW_RADIUS_C)
+    end_c = min(grid.width, center_c + VIEW_RADIUS_C + 1)
+    
+    #  For each row print the cells as # . + →
+    for r in range(start_r, end_r):
+        line = []
+        for c in range(start_c, end_c):
+            if (r, c) == r_grid:
+                line.append(arrow)  # Robot position
+            elif (r, c) in path_set:
+                line.append('+')    # Path node
+            elif grid.grid[r][c] == 1:
+                line.append('#')    # Obstacle
+            else:
+                line.append('.')    # Free space
+        print(f"{r:02d} {''.join(line)}")
 
 def check_map_alignment(grid):
     print("Corner Check:")

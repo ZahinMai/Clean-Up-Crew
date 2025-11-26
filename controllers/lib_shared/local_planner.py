@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from typing import List, Tuple, Dict
+from collections import deque # New Import
 
 DEFAULTS: Dict[str, float] = {
     "DT_CTRL": 0.08,
@@ -23,7 +24,14 @@ DEFAULTS: Dict[str, float] = {
     "EPS": 0.12,
     "D_NORM": 2.0,
 }
-
+# Defaults for Stuck Detection
+STUCK_DEFAULTS: Dict[str, float] = {
+    "WINDOW_LEN": 25,
+    "AVG_THRESHOLD": 0.02,
+    "COOLDOWN": 1.5,
+    "RECOVERY_V": -0.10,
+    "RECOVERY_W": 0.9,
+}
 
 def _clamp(x: float, a: float, b: float) -> float:
     if x < a:
@@ -47,8 +55,18 @@ class DWA:
         if params:
             p.update(params)
         self.p = p
+        
+        # Stuck detection state (New)
+        self.speed_window = deque(maxlen=int(STUCK_DEFAULTS["WINDOW_LEN"]))
+        self.last_unstuck_time = -10.0
+        self.unstuck_cooldown = STUCK_DEFAULTS["COOLDOWN"]
+        self.avg_threshold = STUCK_DEFAULTS["AVG_THRESHOLD"]
+        self.recovery_v = STUCK_DEFAULTS["RECOVERY_V"]
+        self.recovery_w = STUCK_DEFAULTS["RECOVERY_W"]
 
+    # ... (rollout and _min_clear methods remain the same) ...
     def rollout(self, v: float, w: float) -> List[Tuple[float, float, float]]:
+        # ... (Implementation as before) ...
         x = 0.0
         y = 0.0
         th = 0.0
@@ -69,6 +87,7 @@ class DWA:
         traj_xy: List[Tuple[float, float]],
         obs_xy: List[Tuple[float, float]],
     ) -> float:
+        # ... (Implementation as before) ...
         if not obs_xy:
             return float("inf")
         dmin = float("inf")
@@ -86,6 +105,7 @@ class DWA:
         prev_cmd: Tuple[float, float] = (0.0, 0.0),
         cur: Tuple[float, float] = (0.0, 0.0),
     ) -> Tuple[float, float]:
+        # ... (Implementation as before - core DWA score calculation) ...
         p = self.p
         vcur, wcur = cur
 
@@ -168,3 +188,40 @@ class DWA:
             return 0.05, 0.0
 
         return best
+
+    def get_stuck_safe_velocities(
+        self,
+        lidar_points: List[Tuple[float, float]],
+        goal_vec: Tuple[float, float],
+        cur_time: float,
+        prev_cmd: Tuple[float, float] = (0.0, 0.0),
+        cur: Tuple[float, float] = (0.0, 0.0),
+    ) -> Tuple[float, float]:
+        """
+        Calculates safe velocities and applies stuck detection/recovery logic.
+        """
+        # 1. Get DWA-calculated command
+        v_cmd, w_cmd = self.get_safe_velocities(lidar_points, goal_vec, prev_cmd, cur)
+
+        # 2. Stuck Detection Check
+        self.speed_window.append(abs(v_cmd))
+        stuck = (
+            len(self.speed_window) == self.speed_window.maxlen
+            and sum(self.speed_window) / len(self.speed_window) < self.avg_threshold
+        )
+
+        v, w = v_cmd, w_cmd
+
+        # 3. Stuck Recovery Logic
+        if stuck and (cur_time - self.last_unstuck_time) > self.unstuck_cooldown:
+            # Perform a hard turn to unstick
+            print("[DWA: RECOVERY] STUCK! Initiating turn recovery.")
+            # Reverse slightly and turn hard, magnitude of turn based on last angular velocity
+            turn_sign = math.copysign(1.0, -w if w != 0 else 1.0)
+            v, w = self.recovery_v, self.recovery_w * turn_sign
+            
+            self.last_unstuck_time = cur_time
+            self.speed_window.clear() # Reset window after recovery
+
+        # 4. Return potentially modified command
+        return v, w

@@ -27,7 +27,7 @@ dwa_config = {
     'A_W': 2.0,
     'RADIUS': 0.09,
     'SAFE': 0.01,
-    'ALPHA': 0.6,
+    'ALPHA': 0.3,
     'BETA': 0.3,
     'GAMMA': 0.6,
     'DELTA': 0.1,
@@ -152,6 +152,7 @@ def main():
         # Get Velocities
         if DWA_ENABLED:
             v, w = dwa.get_safe_velocities(get_lidar_points(lidar), (gx_r, gy_r), prev_cmd, prev_cmd)
+            
         else:
             # Simple Proportional fallback
             dist = math.hypot(gx_r, gy_r)
