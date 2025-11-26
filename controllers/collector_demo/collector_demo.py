@@ -1,174 +1,197 @@
-# controllers/collector_demo/collector_demo.py
-# TurtleBot3 Burger + DWA local planner demo (Webots)
-# Includes smoothing (anti-oscillation) and stuck-recovery.
-
 from controller import Robot
-import math, os, sys
+import math
+import os
+import sys
 from collections import deque
 
-# ----- allow importing ../lib_shared -----------------------------------------
 THIS_DIR = os.path.dirname(__file__)
-CTRL_DIR = os.path.dirname(THIS_DIR)               # .../controllers
+CTRL_DIR = os.path.dirname(THIS_DIR)
 if CTRL_DIR not in sys.path:
     sys.path.append(CTRL_DIR)
-# -----------------------------------------------------------------------------
 
 from lib_shared.local_planner import DWA
 
-# ---------- device names (must match your robot) -----------------------------
-LEFT_MOTOR   = 'left wheel motor'
-RIGHT_MOTOR  = 'right wheel motor'
-LIDAR_NAME   = 'LDS-01'          # under extensionSlot; rename here if different
-IMU_NAME     = 'inertial unit'   # under extensionSlot
-COMPASS_NAME = 'compass'         # optional fallback (add if you like)
-GPS_NAME     = 'gps'             # you added this under extensionSlot
-# -----------------------------------------------------------------------------
+LEFT_MOTOR = "left wheel motor"
+RIGHT_MOTOR = "right wheel motor"
+LIDAR_NAME = "LDS-01"
+IMU_NAME = "inertial unit"
+COMPASS_NAME = "compass"
+GPS_NAME = "gps"
 
-# ---------- robot geometry (TB3 Burger approx) -------------------------------
 WHEEL_RADIUS = 0.033
-AXLE_LENGTH  = 0.160
-# -----------------------------------------------------------------------------
+AXLE_LENGTH = 0.160
 
-# ---------- helpers ----------------------------------------------------------
+
 def get_device(robot, name):
     try:
         return robot.getDevice(name)
-    except:
+    except Exception:
         return None
-
-def get_yaw(imu, compass):
-    """Return yaw [rad] using IMU if available, compass otherwise, else 0."""
-    if imu:
-        r, p, y = imu.getRollPitchYaw()
-        return y
-    if compass:
-        n = compass.getValues()  # [x, y, z]
-        return math.atan2(n[0], n[2])
-    return 0.0
-
-def world_to_robot(dx, dz, yaw):
-    """Transform world-frame goal offset (dx,dz) to robot frame (gx,gy)."""
-    gx =  dx*math.cos(-yaw) - dz*math.sin(-yaw)
-    gy =  dx*math.sin(-yaw) + dz*math.cos(-yaw)
-    return gx, gy
-# -----------------------------------------------------------------------------
 
 
 def main():
     robot = Robot()
     ts = int(robot.getBasicTimeStep())
 
-    # --- wheels ---
     lm = get_device(robot, LEFT_MOTOR)
     rm = get_device(robot, RIGHT_MOTOR)
-    lm.setPosition(float('inf')); rm.setPosition(float('inf'))
-    lm.setVelocity(0.0); rm.setVelocity(0.0)
+    lm.setPosition(float("inf"))
+    rm.setPosition(float("inf"))
+    lm.setVelocity(0.0)
+    rm.setVelocity(0.0)
 
-    # --- sensors (robust enable) ---
     imu = get_device(robot, IMU_NAME)
-    if imu: imu.enable(ts)
+    if imu:
+        imu.enable(ts)
     compass = get_device(robot, COMPASS_NAME)
-    if compass: compass.enable(ts)
-    gps = get_device(robot, GPS_NAME); gps.enable(ts)
-    lidar = get_device(robot, LIDAR_NAME); lidar.enable(ts)
+    if compass:
+        compass.enable(ts)
+    gps = get_device(robot, GPS_NAME)
+    if gps:
+        gps.enable(ts)
+    lidar = get_device(robot, LIDAR_NAME)
+    lidar.enable(ts)
 
-    # --- DWA (tunable params) ---
-    dwa = DWA({
-        # keep conservative for tight cafeteria aisles
-        "V_MAX":   0.25,  # m/s cap (helps stay under wheel limits)
-        "SAFE":    0.10,  # hard min clearance after inflation (see local_planner)
-        "CLEAR_N": 1.00,  # clearance normalization (1.0 m -> full credit)
-        "GAMMA":   0.50,  # clearance weight
-        "BETA":    0.35,  # goal progress
-        "ALPHA":   0.30,  # heading alignment
-        "EPS":     0.10   # smoothness (higher = less jerky)
-    })
+    dwa = DWA(
+        {
+            "V_MAX": 0.20,
+            "SAFE": 0.10,
+            "CLEAR_N": 0.8,
+            "GAMMA": 0.60,
+            "BETA": 0.35,
+            "ALPHA": 0.30,
+            "EPS": 0.12,
+        }
+    )
 
-    # smoothing state
     prev = (0.0, 0.0)
-    SMOOTH = 0.6  # 0..1 (higher = smoother, slower to react)
+    smooth_gain = 0.6
 
-    # stuck detection state
-    SPEED_WINDOW = deque(maxlen=20)  # ~1.5–2s history (depends on timestep)
-    AVG_THRESHOLD = 0.02             # m/s; below this average we consider "stuck"
+    speed_window = deque(maxlen=25)
+    avg_threshold = 0.02
     last_unstuck = -10.0
-    UNSTUCK_COOLDOWN = 1.5           # seconds of sim time between spins
-
-    # --- simple patrol waypoints (x,z in world meters) ---
-    # Put these in open aisles of your cafeteria (adjust to your layout).
-    WAYPOINTS = [
-        (0.90, 0.00),
-        (0.90, 0.90),
-        (-0.80, 0.90),
-        (-0.80, 0.00),
-    ]
-    wp_i = 0
+    unstuck_cooldown = 1.5
+    turn_sign = 1.0
 
     while robot.step(ts) != -1:
-        # Pose
-        x, _, z = gps.getValues()
-        yaw = get_yaw(imu, compass)
-
-        # Waypoint management
-        tx, tz = WAYPOINTS[wp_i]
-        dx, dz = (tx - x), (tz - z)
-        if math.hypot(dx, dz) < 0.18:
-            wp_i = (wp_i + 1) % len(WAYPOINTS)
-            continue
-
-        # Lidar → (x,y) obstacle points in robot frame
         ranges = lidar.getRangeImage()
-        hfov   = lidar.getFov()
-        nscan  = lidar.getHorizontalResolution()
+        hfov = lidar.getFov()
+        nscan = lidar.getHorizontalResolution()
+
         obs = []
-        for i, r in enumerate(ranges):
-            if r == float('inf') or r <= 0.03:
-                continue
-            a = -hfov/2 + hfov * (i / (nscan - 1))
-            obs.append((r*math.cos(a), r*math.sin(a)))
+        a_best = 0.0
+        best_score = -1.0
+        max_consider = 1.2
 
-        # Goal in robot frame
-        gx, gy = world_to_robot(dx, dz, yaw)
+        min_front = float("inf")
+        front_left = 0.0
+        front_right = 0.0
+        front_width = math.radians(60.0)
 
-        # DWA (raw)
-        v, w = dwa.get_safe_velocities(obs, (gx, gy), prev_cmd=prev, cur=prev)
+        if nscan > 1:
+            for i, r in enumerate(ranges):
+                if r == float("inf") or r <= 0.04:
+                    continue
+                a = -hfov * 0.5 + hfov * (i / (nscan - 1))
+                x_obs = r * math.cos(a)
+                y_obs = r * math.sin(a)
+                obs.append((x_obs, y_obs))
 
-        # --- Anti-oscillation smoothing -------------------------------------
-        v = SMOOTH * prev[0] + (1.0 - SMOOTH) * v
-        w = SMOOTH * prev[1] + (1.0 - SMOOTH) * w
-        prev = (v, w)
-        # ---------------------------------------------------------------------
+                if abs(a) <= math.radians(90.0):
+                    score = min(r, max_consider)
+                    if score > best_score:
+                        best_score = score
+                        a_best = a
 
-        # --- Stuck detection & recovery --------------------------------------
-        # track commanded linear speed magnitude
-        SPEED_WINDOW.append(abs(v))
+                if abs(a) < front_width * 0.5:
+                    if r < min_front:
+                        min_front = r
+                    val = max(0.0, 0.5 - r)
+                    if a >= 0.0:
+                        front_left += val
+                    else:
+                        front_right += val
+
+        front_block = min_front < 0.32
+
+        if best_score < 0.0:
+            r_goal = 0.6
+            a_goal = 0.0
+        else:
+            r_goal = min(best_score, 0.6)
+            a_goal = a_best
+
+        gx = r_goal * math.cos(a_goal)
+        gy = r_goal * math.sin(a_goal)
+
+        if front_block:
+            if front_left > front_right:
+                turn_sign = -1.0
+            elif front_right > front_left:
+                turn_sign = 1.0
+            v = -0.10
+            w = 0.9 * turn_sign
+            v_cmd = v
+            w_cmd = w
+        else:
+            v_cmd, w_cmd = dwa.get_safe_velocities(
+                obs, (gx, gy), prev_cmd=prev, cur=prev
+            )
+            v = smooth_gain * prev[0] + (1.0 - smooth_gain) * v_cmd
+            w = smooth_gain * prev[1] + (1.0 - smooth_gain) * w_cmd
+
+        max_v = 0.12
+        max_w = 0.9
+        if v > max_v:
+            v = max_v
+        if v < -max_v:
+            v = -max_v
+        if w > max_w:
+            w = max_w
+        if w < -max_w:
+            w = -max_w
+
+        speed_window.append(abs(v))
         now = robot.getTime()
-        stuck = (len(SPEED_WINDOW) == SPEED_WINDOW.maxlen and
-                 sum(SPEED_WINDOW) / len(SPEED_WINDOW) < AVG_THRESHOLD)
+        stuck = (
+            len(speed_window) == speed_window.maxlen
+            and sum(speed_window) / len(speed_window) < avg_threshold
+        )
 
-        if stuck and (now - last_unstuck) > UNSTUCK_COOLDOWN:
-            # rotate gently in place to search for a free direction
-            v = 0.00
-            w = 0.5  # rad/s; 0.3..0.8 depending on clutter
-            prev = (v, w)
+        if stuck and (now - last_unstuck) > unstuck_cooldown:
+            if front_left > front_right:
+                turn_sign = -1.0
+            elif front_right > front_left:
+                turn_sign = 1.0
+            v = -0.10
+            w = 0.9 * turn_sign
             last_unstuck = now
-        # ---------------------------------------------------------------------
+            speed_window.clear()
 
-        # Convert (v,w) -> wheel angular velocities
-        wl = (v - 0.5*w*AXLE_LENGTH) / WHEEL_RADIUS
-        wr = (v + 0.5*w*AXLE_LENGTH) / WHEEL_RADIUS
+        prev = (v, w)
 
-        # Clamp to motor max to avoid warnings
-        max_w = min(lm.getMaxVelocity(), rm.getMaxVelocity())  # TB3 ~6.67 rad/s
-        wl = max(-max_w, min(max_w, wl))
-        wr = max(-max_w, min(max_w, wr))
+        wl = (v - 0.5 * w * AXLE_LENGTH) / WHEEL_RADIUS
+        wr = (v + 0.5 * w * AXLE_LENGTH) / WHEEL_RADIUS
+
+        max_wheel = min(lm.getMaxVelocity(), rm.getMaxVelocity())
+        if wl > max_wheel:
+            wl = max_wheel
+        if wl < -max_wheel:
+            wl = -max_wheel
+        if wr > max_wheel:
+            wr = max_wheel
+        if wr < -max_wheel:
+            wr = -max_wheel
 
         lm.setVelocity(wl)
         rm.setVelocity(wr)
 
-        # Debug (≈1 Hz)
-        if int(robot.getTime()) % 1 == 0:
-            print(f"[DWA] wp={wp_i} v={v:.2f} w={w:.2f} wl={wl:.2f} wr={wr:.2f} obs={len(obs)}")
+        if int(robot.getTime() * 2.0) % 4 == 0:
+            print(
+                f"[DWA] v={v:.2f} w={w:.2f} wl={wl:.2f} wr={wr:.2f} "
+                f"front={min_front:.2f} obs={len(obs)}"
+            )
+
 
 if __name__ == "__main__":
     main()
