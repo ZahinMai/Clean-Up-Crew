@@ -1,53 +1,65 @@
-# Shared library for Emitter/Receiver communication.
-# Implemented by: Kunal Khose
+import json
 
-import json, sys, os
-from controller import Emitter, Receiver
-
-# ---- So I can import lib_shared ---- #
-THIS_DIR = os.path.dirname(__file__)
-PARENT_DIR = os.path.dirname(THIS_DIR)
-if PARENT_DIR not in sys.path:
-    sys.path.insert(0, PARENT_DIR)
-# ----------------------------------- #
-
-class CommDevice:
+class Communication:
     """
-    Wrapper for Webots Emitter + Receiver.
-    Allows all robots to send JSON dictionaries to each other cleanly.
+    Shared communication library for all robots.
+    Provides simple send() and receive() wrappers.
     """
 
-    def __init__(self, robot, tx_name="emitter", rx_name="receiver", channel=1):
+    def __init__(self, robot, channel=1, verbose=False):
         self.robot = robot
-        self.emitter = robot.getDevice(tx_name)
-        self.receiver = robot.getDevice(rx_name)
+        self.verbose = verbose
 
-        # Bind to communication channel (same for all robots)
+        # Emitter setup
+        self.emitter = robot.getDevice("emitter")
         self.emitter.setChannel(channel)
-        self.receiver.setChannel(channel)
+
+        # Receiver setup
+        self.receiver = robot.getDevice("receiver")
         self.receiver.enable(int(robot.getBasicTimeStep()))
+        self.receiver.setChannel(channel)
 
-    # ----------------------------------------------------------------------
-
+    # ---------------------------
+    # Sending messages
+    # ---------------------------
     def send(self, data: dict):
-        """Send a JSON dictionary to all robots on same channel."""
+        """
+        Sends a JSON message to all devices in this channel.
+        """
         try:
-            msg = json.dumps(data).encode("utf-8")
-            self.emitter.send(msg)
+            msg = json.dumps(data)
+            self.emitter.send(msg.encode('utf-8'))
+
+            if self.verbose:
+                print("[COMM-SEND]:", msg)
+
         except Exception as e:
-            print("[CommDevice] ERROR while sending:", e)
+            print("Communication send error:", e)
 
-    # ----------------------------------------------------------------------
+    # ---------------------------
+    # Receiving messages
+    # ---------------------------
+    def receive(self):
+        """
+        Returns the newest message as a Python dict.
+        Returns None if no messages are available.
+        """
+        if self.receiver.getQueueLength() > 0:
+            raw = self.receiver.getData()
+            msg = raw.decode("utf-8")
 
-    def receive_all(self):
-        """Return a list of all JSON messages available this timestep."""
-        messages = []
-
-        while self.receiver.getQueueLength() > 0:
             try:
-                raw = self.receiver.getData().decode("utf-8")
-                messages.append(json.loads(raw))
-            except Exception as e:
-                print("[CommDevice] ERROR while receiving:", e)
+                data = json.loads(msg)
+            except:
+                data = None
 
+            # Remove from queue
             self.receiver.nextPacket()
+
+            if self.verbose:
+                print("[COMM-RECV]:", data)
+
+            return data
+
+        return None
+
