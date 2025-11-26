@@ -31,37 +31,31 @@ performance in a simple, controlled environmen
 # Team Task Split
 
 ## Zahin
-**Mapping + Planning**
+**Mapping, Planning and Collector controller**
 
 - [x]  Build 2D occupancy grid
-- [x]  Implement A* global planner that outputs waypoint list for navigation
-- [x]  Visualise A*
-- [ ]  Integrate A* waypoints with DWA local controller
-
-### **Collector Controller**
-
+- [x]  Path planning with A*
+- [ ]  Text-based visualisations for debugging
+- [x]  Collector navigation
 - [ ]  Implement FSM (IDLE → GETTING_TASK → GOING_TO_TRASH → GOING_TO_BIN)
 - [ ]  Emit `im_idle` status
 
 ---
 ## **Abdullateef**
-**Perception & CPP**
+**Perception, CPP and Spotter controller**
 
 - [x]  Implement color-blob detection with camera
 - [ ]  Output trash coordinates
 - [x]  Implement Boustrophedon (lawn-mower) pattern
-- [ ]  Execute coverage movement
 
 ---
 
 ## **Ajinkya**
-### **Environment**
+### **Environment & Obstacle Avoidance **
 - [x]  Build cafeteria world (walls, tables, bin zone)
 - [x]  Add dynamic obstacle patrol bot
-
-### **Local Planner**
 - [ ]  Implement DWA using lidar (to be completed) that outputs safe (v, ω) (to be completed)
-- [ ]  Test full collector navigation loop
+- [ ]  Integrate A* with DWA in Collector controller. Test full collector navigation loop.
 
 ## **Kunal**
 
