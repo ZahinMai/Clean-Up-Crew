@@ -9,13 +9,11 @@ class OdometryGotoConfiguration:
     def __init__(self):
         self.speed_min = 1
 
-
 class OdometryGotoState:
     def __init__(self):
         self.goal_x = 0.0
         self.goal_y = 0.0
         self.goal_theta = 0.0
-
 
 class OdometryGotoResult:
     def __init__(self):
