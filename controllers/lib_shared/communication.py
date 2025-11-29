@@ -45,8 +45,9 @@ class Communication:
         Returns None if no messages are available.
         """
         if self.receiver.getQueueLength() > 0:
-            raw = self.receiver.getData()
-            msg = raw.decode("utf-8")
+            raw = self.receiver.getString()
+            if isinstance(raw, bytes): msg = raw.decode("utf-8")
+            else: msg = raw
 
             try:
                 data = json.loads(msg)
@@ -62,4 +63,3 @@ class Communication:
             return data
 
         return None
-
