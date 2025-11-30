@@ -137,7 +137,7 @@ class SpotterController:
         self.config = RobotConfig()
         self.hw = HardwareInterface(Robot(), self.config)
         
-        self.grid = get_map(origin=self.config.MAP_ORIGIN)
+        self.grid = get_map()
         self.planner = AStarPlanner()
         
         self.dwa = DWA({
