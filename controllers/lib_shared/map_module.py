@@ -5,7 +5,7 @@ from .global_planner import OccupancyGrid
 # --- CONFIGURATION ---
 GRID_W, GRID_H = 35, 21 # cells
 DEFAULT_CELL_SIZE = 7.7/21 # meters
-ORIGIN = -5.8, -3 # meters (bottom-left corner in world coordinates)
+ORIGIN = -6.2, -2.9 # meters (bottom-left corner in world coordinates)
 # The 21x35 Map String
 CAFETERIA_MAP = """
 ###################################

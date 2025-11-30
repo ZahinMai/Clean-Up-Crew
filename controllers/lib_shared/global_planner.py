@@ -35,7 +35,7 @@ class OccupancyGrid:
     def grid_to_world(self, r: int, c: int) -> Tuple[float, float]:
         x = c * self.cell_size + self.origin[0] + self.cell_size * 0.5
         y = self.max_y - (r * self.cell_size) - self.cell_size * 0.5
-        return x, y
+        return round(x, 2), round(y, 2)
 
     def is_valid(self, r: int, c: int) -> bool:
         return 0 <= r < self.height and 0 <= c < self.width

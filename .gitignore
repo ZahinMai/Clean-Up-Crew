@@ -15,3 +15,6 @@ TestResults.xml
 # Python cache files
 *.pyc
 __pycache__/
+.DS_Store
+controllers/.DS_Store
+worlds/.cafetria.jpg
