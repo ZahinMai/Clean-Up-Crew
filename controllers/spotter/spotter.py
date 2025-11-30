@@ -62,8 +62,8 @@ class HardwareInterface:
             self.lidar.enable(self.timestep)
             self.lidar_fov = self.lidar.getFov()
 
-        self.lm = self.robot.getDevice('left wheel motor') or self.robot.getDevice('left wheel') # TODO: Confirm names
-        self.rm = self.robot.getDevice('right wheel motor') or self.robot.getDevice('right wheel')
+        self.lm = self.robot.getDevice('left wheel motor')
+        self.rm = self.robot.getDevice('right wheel motor')
         self.lm.setPosition(float('inf'))
         self.rm.setPosition(float('inf'))
         self.set_velocities(0, 0)
