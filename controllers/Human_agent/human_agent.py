@@ -30,14 +30,14 @@ WAYPOINTS = [
 ]
 
 
-def get_device(robot, name):
+def dev(robot, name):
     try:
         return robot.getDevice(name)
     except Exception:
         return None
 
 
-def get_yaw(imu, compass):
+def yaw_from(imu, compass):
     if imu:
         _, _, y = imu.getRollPitchYaw()
         return y
@@ -57,41 +57,48 @@ def main():
     robot = Robot()
     ts = int(robot.getBasicTimeStep())
 
-    lm = get_device(robot, LEFT)
-    rm = get_device(robot, RIGHT)
+    lm = dev(robot, LEFT)
+    rm = dev(robot, RIGHT)
     lm.setPosition(float("inf"))
     rm.setPosition(float("inf"))
     lm.setVelocity(0.0)
     rm.setVelocity(0.0)
 
-    imu = get_device(robot, IMU_NAME)
+    imu = dev(robot, IMU_NAME)
     if imu:
         imu.enable(ts)
-    compass = get_device(robot, COMPASS_NAME)
+    compass = dev(robot, COMPASS_NAME)
     if compass:
         compass.enable(ts)
-    gps = get_device(robot, GPS_NAME)
+    gps = dev(robot, GPS_NAME)
     if gps:
         gps.enable(ts)
-    lidar = get_device(robot, LIDAR_NAME)
+    lidar = dev(robot, LIDAR_NAME)
     if lidar:
         lidar.enable(ts)
 
     dwa = DWA(
         {
-            "V_MAX": 0.18,
-            "SAFE": 0.10,
-            "CLEAR_N": 0.8,
-            "GAMMA": 0.55,
-            "BETA": 0.35,
-            "ALPHA": 0.30,
-            "EPS": 0.10,
+            "V_MAX": 0.30,
+            "SAFE": 0.08,
+            "CLEAR_N": 0.6,
+            "GAMMA": 0.22,
+            "BETA": 0.34,
+            "ALPHA": 0.18,
+            "DELTA": 0.46,
+            "EPS": 0.05,
         }
     )
 
     idx = 0
     prev = (0.0, 0.0)
-    smooth_gain = 0.6
+    smooth = 0.15
+
+    last_move_time = 0.0
+    last_x = None
+    last_z = None
+    recovery_until = 0.0
+    recovery_sign = 1.0
 
     while robot.step(ts) != -1:
         if not gps or not lidar:
@@ -99,38 +106,54 @@ def main():
             rm.setVelocity(0.0)
             continue
 
+        now = robot.getTime()
         x, _, z = gps.getValues()
-        yaw = get_yaw(imu, compass)
+        yaw = yaw_from(imu, compass)
 
         tx, tz = WAYPOINTS[idx]
         dx = tx - x
         dz = tz - z
-        if math.hypot(dx, dz) < 0.18:
+        if math.hypot(dx, dz) < 0.22:
             idx = (idx + 1) % len(WAYPOINTS)
             continue
 
         ranges = lidar.getRangeImage()
         hfov = lidar.getFov()
         nscan = lidar.getHorizontalResolution()
-        obs = []
+        pts = []
         if nscan > 1:
             for i, r in enumerate(ranges):
                 if r == float("inf") or r <= 0.04:
                     continue
-                a = -hfov * 0.5 + hfov * (i / (nscan - 1))
-                x_obs = r * math.cos(a)
-                y_obs = r * math.sin(a)
-                obs.append((x_obs, y_obs))
+                a = -hfov * 0.5 + hfov * i / (nscan - 1)
+                x_o = r * math.cos(a)
+                y_o = r * math.sin(a)
+                pts.append((x_o, y_o))
+
+        if last_x is None:
+            last_x, last_z = x, z
+            last_move_time = now
+        else:
+            dist = math.hypot(x - last_x, z - last_z)
+            if dist > 0.05:
+                last_x, last_z = x, z
+                last_move_time = now
+            elif now - last_move_time > 3.0 and recovery_until <= now:
+                recovery_sign *= -1.0
+                recovery_until = now + 2.0
 
         gx, gy = world_to_robot(dx, dz, yaw)
 
-        v_cmd, w_cmd = dwa.get_safe_velocities(obs, (gx, gy), prev_cmd=prev, cur=prev)
+        if recovery_until > now:
+            v = -0.18
+            w = 1.2 * recovery_sign
+        else:
+            v_cmd, w_cmd = dwa.get_safe_velocities(pts, (gx, gy), prev_cmd=prev, cur=prev)
+            v = smooth * prev[0] + (1.0 - smooth) * v_cmd
+            w = smooth * prev[1] + (1.0 - smooth) * w_cmd
 
-        v = smooth_gain * prev[0] + (1.0 - smooth_gain) * v_cmd
-        w = smooth_gain * prev[1] + (1.0 - smooth_gain) * w_cmd
-
-        max_v = 0.12
-        max_w = 0.8
+        max_v = 0.26
+        max_w = 1.4
         if v > max_v:
             v = max_v
         if v < -max_v:
@@ -158,9 +181,9 @@ def main():
         lm.setVelocity(wl)
         rm.setVelocity(wr)
 
-        if int(robot.getTime() * 2.0) % 4 == 0:
+        if int(now * 2.0) % 4 == 0:
             print(
-                f"[human DWA] wp={idx} v={v:.2f} w={w:.2f} wl={wl:.2f} wr={wr:.2f} obs={len(obs)}"
+                f"[human] wp={idx} v={v:.2f} w={w:.2f} wl={wl:.2f} wr={wr:.2f} obs={len(pts)}"
             )
 
 
