@@ -29,6 +29,22 @@ def get_device(robot, name):
         return None
 
 
+def get_yaw(imu, compass):
+    if imu:
+        _, _, y = imu.getRollPitchYaw()
+        return y
+    if compass:
+        n = compass.getValues()
+        return math.atan2(n[0], n[2])
+    return 0.0
+
+
+def world_to_robot(dx, dz, yaw):
+    gx = dx * math.cos(-yaw) - dz * math.sin(-yaw)
+    gy = dx * math.sin(-yaw) + dz * math.cos(-yaw)
+    return gx, gy
+
+
 def main():
     robot = Robot()
     ts = int(robot.getBasicTimeStep())
@@ -50,7 +66,8 @@ def main():
     if gps:
         gps.enable(ts)
     lidar = get_device(robot, LIDAR_NAME)
-    lidar.enable(ts)
+    if lidar:
+        lidar.enable(ts)
 
     dwa = DWA(
         {
@@ -64,8 +81,16 @@ def main():
         }
     )
 
+    waypoints = [
+        (0.90, 0.00),
+        (0.90, 0.90),
+        (-0.80, 0.90),
+        (-0.80, 0.00),
+    ]
+    wp_idx = 0
+
     prev = (0.0, 0.0)
-    smooth_gain = 0.6
+    smooth_gain = 0.65
 
     speed_window = deque(maxlen=25)
     avg_threshold = 0.02
@@ -74,19 +99,31 @@ def main():
     turn_sign = 1.0
 
     while robot.step(ts) != -1:
+        if not gps or not lidar:
+            lm.setVelocity(0.0)
+            rm.setVelocity(0.0)
+            continue
+
+        x, _, z = gps.getValues()
+        yaw = get_yaw(imu, compass)
+
+        tx, tz = waypoints[wp_idx]
+        dx = tx - x
+        dz = tz - z
+        if math.hypot(dx, dz) < 0.20:
+            wp_idx = (wp_idx + 1) % len(waypoints)
+            continue
+
         ranges = lidar.getRangeImage()
         hfov = lidar.getFov()
         nscan = lidar.getHorizontalResolution()
 
         obs = []
-        a_best = 0.0
-        best_score = -1.0
-        max_consider = 1.2
-
         min_front = float("inf")
-        front_left = 0.0
-        front_right = 0.0
+        left_score = 0.0
+        right_score = 0.0
         front_width = math.radians(60.0)
+        avoid_dist = 0.35
 
         if nscan > 1:
             for i, r in enumerate(ranges):
@@ -96,47 +133,28 @@ def main():
                 x_obs = r * math.cos(a)
                 y_obs = r * math.sin(a)
                 obs.append((x_obs, y_obs))
-
-                if abs(a) <= math.radians(90.0):
-                    score = min(r, max_consider)
-                    if score > best_score:
-                        best_score = score
-                        a_best = a
-
                 if abs(a) < front_width * 0.5:
                     if r < min_front:
                         min_front = r
-                    val = max(0.0, 0.5 - r)
+                    val = max(0.0, avoid_dist - r)
                     if a >= 0.0:
-                        front_left += val
+                        left_score += val
                     else:
-                        front_right += val
+                        right_score += val
 
-        front_block = min_front < 0.32
+        gx, gy = world_to_robot(dx, dz, yaw)
 
-        if best_score < 0.0:
-            r_goal = 0.6
-            a_goal = 0.0
-        else:
-            r_goal = min(best_score, 0.6)
-            a_goal = a_best
+        front_block = min_front < avoid_dist
 
-        gx = r_goal * math.cos(a_goal)
-        gy = r_goal * math.sin(a_goal)
-
-        if front_block:
-            if front_left > front_right:
+        if front_block and gx > 0.0:
+            if left_score > right_score:
                 turn_sign = -1.0
-            elif front_right > front_left:
+            elif right_score > left_score:
                 turn_sign = 1.0
             v = -0.10
             w = 0.9 * turn_sign
-            v_cmd = v
-            w_cmd = w
         else:
-            v_cmd, w_cmd = dwa.get_safe_velocities(
-                obs, (gx, gy), prev_cmd=prev, cur=prev
-            )
+            v_cmd, w_cmd = dwa.get_safe_velocities(obs, (gx, gy), prev_cmd=prev, cur=prev)
             v = smooth_gain * prev[0] + (1.0 - smooth_gain) * v_cmd
             w = smooth_gain * prev[1] + (1.0 - smooth_gain) * w_cmd
 
@@ -159,9 +177,9 @@ def main():
         )
 
         if stuck and (now - last_unstuck) > unstuck_cooldown:
-            if front_left > front_right:
+            if left_score > right_score:
                 turn_sign = -1.0
-            elif front_right > front_left:
+            elif right_score > left_score:
                 turn_sign = 1.0
             v = -0.10
             w = 0.9 * turn_sign
@@ -188,10 +206,10 @@ def main():
 
         if int(robot.getTime() * 2.0) % 4 == 0:
             print(
-                f"[DWA] v={v:.2f} w={w:.2f} wl={wl:.2f} wr={wr:.2f} "
-                f"front={min_front:.2f} obs={len(obs)}"
+                f"[collector DWA] wp={wp_idx} v={v:.2f} w={w:.2f} wl={wl:.2f} wr={wr:.2f} obs={len(obs)}"
             )
 
 
 if __name__ == "__main__":
     main()
+

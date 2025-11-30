@@ -63,4 +63,3 @@ class Communication:
             return data
 
         return None
-
