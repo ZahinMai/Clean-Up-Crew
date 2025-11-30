@@ -243,6 +243,7 @@ class SpotterController:
                         path = self.planner.smooth_path(self.grid, path)
                         self.active_path = [self.grid.grid_to_world(r, c) for r, c in path]
                     else:
+                        print("Path not found, skipping waypoint.")
                         self.wp_index += 1 # Skip unreachable point
                         continue
                 else:
@@ -251,7 +252,7 @@ class SpotterController:
 
             # Local Targeting. Aim for the first point in path, pop if close enough
             target = goal
-            if self.active_path:
+            if self.active_path: 
                 target = self.active_path[0]
                 if math.hypot(target[0]-rx, target[1]-ry) < self.config.PATH_NODE_TOLERANCE:
                     self.active_path.pop(0)
