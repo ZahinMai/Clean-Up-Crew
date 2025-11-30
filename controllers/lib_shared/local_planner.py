@@ -48,7 +48,6 @@ def _ang(a: float) -> float:
         a += 2.0 * math.pi
     return a
 
-
 class DWA:
     def __init__(self, params: Dict | None = None) -> None:
         p = dict(DEFAULTS)

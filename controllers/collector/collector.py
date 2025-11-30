@@ -9,7 +9,7 @@ if os.path.dirname(os.path.dirname(__file__)) not in sys.path:
 from lib_shared.communication import Communication
 from lib_shared.global_planner import AStarPlanner
 from lib_shared.map_module import visualise_robot_on_map, get_map
-from lib_shared.local_planner import DWA
+from lib_shared.local_planner import DWA, _ang
 
 WHEEL_RADIUS = 0.033
 AXLE_LENGTH = 0.16
@@ -56,10 +56,9 @@ class Collector(Robot):
         self.robot_id = "collector_1"
         self.state = "IDLE"
         
-        # Commmunication Setup
-        self.comm = Communication(self, channel=1)
+        self.comm = Communication(self, channel=1) # init comm
 
-        # Sensor & Actuator Setup
+        # ------ Sensor & Actuator Setup ------ #
         self.gps = self.getDevice('gps')
         self.gps.enable(self.timestep)
         
@@ -80,25 +79,26 @@ class Collector(Robot):
         self.rm = self.getDevice('right wheel motor')
         self.rm.setPosition(float('inf'))
         self.rm.setVelocity(0)
-
-        # Planning Setup
+        # ------------------------------------- #
+        
+        # ---------- Planning Setup ----------- #
         self.grid = get_map(verbose=False)
         self.plan_grid = self.grid.inflate(0) 
         self.astar = AStarPlanner()
         self.dwa = DWA(params=DWA_CONFIG)
+        # ------------------------------------- #
 
-        # Navigation Variables
-        self.path_world = []     # List of (x, z) tuples
+       # ---------- Navigation Setup ---------- #
+        self.path_world = [] 
         self.path_idx = 0
-        self.current_goal = None # (x, z)
+        self.current_goal = None
         self.last_replan = 0.0
         self.last_vis = 0.0
         self.prev_cmd = (0.0, 0.0)
-        
-        # Robot Pose
         self.rx = 0.0
         self.rz = 0.0
         self.yaw = 0.0
+        # ------------------------------------- #
 
     def update_pose(self):
         """Reads sensors to update robot's internal knowledge of position."""
@@ -159,25 +159,24 @@ class Collector(Robot):
         """ Executes path following. Returns True if still moving, False if arrived."""
         now = self.getTime()
 
-        # Visualisation
+        # ----------- Visualisation ----------- #
         if now - self.last_vis > 0.5:
             vis_path = [self.grid.world_to_grid(wx, wz) for wx, wz in self.path_world]
             visualise_robot_on_map(self.grid, self.rx, self.rz, self.yaw, path=vis_path)
-            print("[Pose] Yaw: ...", self.yaw)
             self.last_vis = now
+        # ------------------------------------- #
 
-        # Path
-        if not self.path_world:
-            return False # No path, considered "arrived" or "idle"
+        if not self.path_world: return False # No path -> "arrived" or "idle"
 
-        # 3. Path Following Logic (Pure Pursuit / Lookahead)
+        # Path Following Logic (Pure Pursuit / Lookahead)
         target = None
         while self.path_idx < len(self.path_world):
             wx, wz = self.path_world[self.path_idx]
             # If close to current waypoint, look at next
-            if math.hypot(wx - self.rx, wz - self.rz) < 0.2:
+            if math.hypot(wx - self.rx, wz - self.rz) < 0.25:
                 self.path_idx += 1
             else:
+                # Target the next waypoint, but don't go past the final one
                 target = self.path_world[min(self.path_idx + 1, len(self.path_world)-1)]
                 break
         
@@ -196,14 +195,16 @@ class Collector(Robot):
 
         # Account for dynamic obstacles w DWA
         if DWA_ENABLED:
-            v, w = self.dwa.get_safe_velocities( get_lidar_points(self.lidar), (gx_r, gy_r), self.prev_cmd, self.prev_cmd)
+            v, w = self.dwa.get_safe_velocities(get_lidar_points(self.lidar), (gx_r, gy_r), self.prev_cmd, self.prev_cmd)
         
         # Simple Proportional Controller
         else:
+            # Calculate distance and angle
             dist = math.hypot(gx_r, gy_r)
-            ang = math.atan2(gy_r, gx_r)
-            v = 0.8 * dist if abs(ang) < 1.0 else 0.0
-            w = 1.5 * ang
+            ang = _ang(math.atan2(gy_r, gx_r))
+            
+            v = 0.5 * dist
+            w = -1.5 * ang # Increased angular gain for snappier turns
             
             # Clamp limits
             v = max(-0.35, min(0.35, v))
@@ -212,8 +213,8 @@ class Collector(Robot):
         self.prev_cmd = (v, w)
 
         # Actuation (Differential Drive Mixing) & Clamping
-        wl = (v - (-w) * AXLE_LENGTH * 0.5) / WHEEL_RADIUS
-        wr = (v + (-w) * AXLE_LENGTH * 0.5) / WHEEL_RADIUS
+        wl = (v + w * AXLE_LENGTH * 0.5) / WHEEL_RADIUS
+        wr = (v - w * AXLE_LENGTH * 0.5) / WHEEL_RADIUS
         
         limit = min(self.lm.getMaxVelocity(), self.rm.getMaxVelocity())
         self.lm.setVelocity(max(-limit, min(limit, wl)))
@@ -225,28 +226,23 @@ class Collector(Robot):
         print("Collector Agent Started. Waiting for tasks...")
         
         while self.step(self.timestep) != -1:
-            # Always update sensors
-            self.update_pose()
+            self.update_pose() # Always update sensors
 
-            # --- Check Communication ---
+            # --- Check Communication --- #
             msg = self.comm.receive()
             if msg:
                 # Filter for tasks assigned to this specific robot
                 if msg.get("event") == "assign_task" and msg.get("collector_id") == self.robot_id:
                     print(f"Task Received: {msg}")
                     
-                    # EXTRACT COORDINATES HERE
-                    # Assuming msg contains 'target_x' and 'target_z' or similar. 
-                    # If not, set hardcoded defaults or parse logic here.
+                    # EXTRACT COORDINATES FROM MSG HERE
                     target_x = msg.get("target_x", 3.5) 
                     target_z = msg.get("target_z", 2.0)
                     
                     # Plan path
                     success = self.plan_path_to_goal(target_x, target_z)
-                    if success:
-                        self.state = "NAVIGATING"
-                    else:
-                        print("Could not plan path to task location.")
+                    if success: self.state = "NAVIGATING"
+                    else: print("Could not plan path to task location.")
 
             # --- Finite State Machine ---
             if self.state == "IDLE":
@@ -262,8 +258,7 @@ class Collector(Robot):
                 if not is_moving:
                     print("Target Reached.")
                     # Task complete? Go back to IDLE or switch to PICKUP
-                    # For now, let's go back to IDLE
-                    self.state = "IDLE"
+                    self.state = "IDLE" # For now, back to IDLE
                     
             elif self.state == "GO_TO_TRASH":
                 # Legacy state name handling if needed
