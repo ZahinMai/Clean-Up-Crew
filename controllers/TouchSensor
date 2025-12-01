@@ -28,7 +28,7 @@ class TouchSensor:
         self.is_trash_detected = False
 
     def simulate_trash_deposit(self) -> None:
-        """Simulate a trash being deposited (for testing purposes)"""
+        """Simulate a trash being deposited"""
         self.is_trash_detected = True
         threading.Timer(0.5, self._reset_sensor).start()  # Reset after 0.5s
 
@@ -37,7 +37,7 @@ class TouchSensor:
         self.is_trash_detected = False
 
     def read_sensor(self) -> bool:
-        """Read current sensor state (call this method to check for trash)"""
+        """Read current sensor state"""
         return self.is_trash_detected
 
     supervisor.sensor.simulate_trash_deposit()  # 3rd trash
