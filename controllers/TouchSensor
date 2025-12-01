@@ -1,0 +1,47 @@
+import threading
+import time
+import json
+from datetime import datetime
+from enum import Enum
+from typing import Optional, Dict, List
+
+# --------------------------
+# Enums & Configuration
+# --------------------------
+class ExperimentState(Enum):
+    """Finite State Machine (FSM) states for the experiment"""
+    IDLE = "IDLE"
+    RUNNING = "RUNNING"
+    PAUSED = "PAUSED"
+    COMPLETED = "COMPLETED"
+
+class Config:
+    """Experiment configuration constants"""
+    SENSOR_POLL_INTERVAL = 0.1  # Seconds between sensor checks
+    LOG_FILE_PATH = "experiment_logs.json"
+    INITIAL_SCORE = 0
+    SCORE_PER_TRASH = 10  # Points awarded per valid trash deposit
+
+class TouchSensor:
+    """Simulates a touch sensor for trash deposit detection"""
+    def __init__(self):
+        self.is_trash_detected = False
+
+    def simulate_trash_deposit(self) -> None:
+        """Simulate a trash being deposited (for testing purposes)"""
+        self.is_trash_detected = True
+        threading.Timer(0.5, self._reset_sensor).start()  # Reset after 0.5s
+
+    def _reset_sensor(self) -> None:
+        """Reset sensor state after detection"""
+        self.is_trash_detected = False
+
+    def read_sensor(self) -> bool:
+        """Read current sensor state (call this method to check for trash)"""
+        return self.is_trash_detected
+
+    supervisor.sensor.simulate_trash_deposit()  # 3rd trash
+
+    # Stop experiment after 2 seconds
+    time.sleep(2)
+    supervisor.stop_experiment()
