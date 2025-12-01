@@ -1,0 +1,47 @@
+import threading
+import time
+import json
+from datetime import datetime
+from enum import Enum
+from typing import Optional, Dict, List
+
+# --------------------------
+# Enums & Configuration
+# --------------------------
+class ExperimentState(Enum):
+    """Finite State Machine (FSM) states for the experiment"""
+    IDLE = "IDLE"
+    RUNNING = "RUNNING"
+    PAUSED = "PAUSED"
+    COMPLETED = "COMPLETED"
+
+class Config:
+    """Experiment configuration constants"""
+    SENSOR_POLL_INTERVAL = 0.1  # Seconds between sensor checks
+    LOG_FILE_PATH = "experiment_logs.json"
+    INITIAL_SCORE = 0
+    SCORE_PER_TRASH = 10  # Points awarded per valid trash deposit
+
+class TrashManager:
+    """Manages spawning and despawning of trash objects"""
+    def __init__(self):
+        self.active_trash_objects: List[str] = []
+        self.trash_id_counter = 0
+
+    def spawn_trash(self) -> str:
+        """Spawn a new trash object and return its ID"""
+        trash_id = f"trash_{self.trash_id_counter}"
+        self.active_trash_objects.append(trash_id)
+        self.trash_id_counter += 1
+        return trash_id
+
+    def despawn_trash(self, trash_id: Optional[str] = None) -> None:
+        """Despawn a specific trash object or all active ones"""
+        if trash_id and trash_id in self.active_trash_objects:
+            self.active_trash_objects.remove(trash_id)
+        elif not trash_id:
+            self.active_trash_objects.clear()
+
+    def get_active_trash_count(self) -> int:
+        """Get number of currently active trash objects"""
+        return len(self.active_trash_objects)
