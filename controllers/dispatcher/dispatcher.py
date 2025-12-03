@@ -3,7 +3,7 @@ Dispatcher Controller
 """
 
 from controller import Robot
-from communication import Communication
+from lib_shared.communication import Communication
 
 class Dispatcher(Robot):
     def __init__(self):
