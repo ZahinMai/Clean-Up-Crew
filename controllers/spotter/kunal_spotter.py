@@ -6,7 +6,7 @@ from controller import Robot
 import math
 import time
 import vision           
-from communication import Communication
+from lib_shared.communication import Communication
 
 
 class Spotter(Robot):
