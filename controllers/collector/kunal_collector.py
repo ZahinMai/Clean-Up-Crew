@@ -5,7 +5,7 @@ Collector Controller
 from controller import Robot
 import math
 import json
-from communication import Communication
+from lib_shared.communication import Communication
 from global_planner import AStarPlanner, OccupancyGrid
 from local_planner import DWA
 
