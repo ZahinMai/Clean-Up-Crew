@@ -1,193 +1,189 @@
-"""
-Collector Robot Controller
-IDLE → GETTING_PATH → GOING_TO_TRASH → GOING_TO_BIN → IDLE
-"""
+# COLLECTOR CONTROLLER 
 
 from controller import Robot
-import math, sys, os
+import math, os, sys, json
 
-ROOT = os.path.dirname(os.path.dirname(__file__))
-sys.path.append(ROOT)
+# PATH SETUP-
+BASE = os.path.dirname(os.path.abspath(__file__))
+CTRL_DIR = os.path.dirname(BASE)
+if CTRL_DIR not in sys.path:
+    sys.path.append(CTRL_DIR)
 
-from lib_shared.communication import Communication
 from lib_shared.global_planner import AStarPlanner
 from lib_shared.local_planner import DWA
 from lib_shared.map_module import get_map
+from communication import CommunicationManager
 
 
-class Collector(Robot):
-    
-    def __init__(self):
-        super().__init__()
-        self.ts = int(self.getBasicTimeStep())
+# ROBOT CONSTANTS
+LEFT = "left wheel motor"
+RIGHT = "right wheel motor"
+WHEEL_RADIUS = 0.033
+AXLE_LENGTH = 0.160
+WAYPOINT_TOL = 0.18
 
-        # Devices 
-        self.left_motor = self.getDevice("left wheel motor")
-        self.right_motor = self.getDevice("right wheel motor")
-        self.left_motor.setPosition(float("inf"))
-        self.right_motor.setPosition(float("inf"))
-        self.left_motor.setVelocity(0)
-        self.right_motor.setVelocity(0)
+# COLLECTOR CLASS
 
-        self.gps = self.getDevice("gps"); self.gps.enable(self.ts)
-        self.imu = self.getDevice("inertial unit"); self.imu.enable(self.ts)
-        self.lidar = self.getDevice("LDS-01"); self.lidar.enable(self.ts)
+    def __init__(self, robot_id="Collector_1"):
+        self.robot = Robot()
+        self.ts = int(self.robot.getBasicTimeStep())
+        self.id = robot_id
 
-        # IDs 
-        self.robot_id = "collector_1"
+        # MOTORS 
+        self.lm = self.robot.getDevice(LEFT); self.lm.setPosition(float('inf'))
+        self.rm = self.robot.getDevice(RIGHT); self.rm.setPosition(float('inf'))
+        self.lm.setVelocity(0); self.rm.setVelocity(0)
 
-        # Communication 
-        self.comm = Communication(self, channel=1)
+        # SENSORS 
+        self.gps = self.robot.getDevice("gps"); self.gps.enable(self.ts)
+        self.imu = self.robot.getDevice("inertial unit"); self.imu.enable(self.ts)
+        self.lidar = self.robot.getDevice("LDS-01"); self.lidar.enable(self.ts)
+
+        # COMMUNICATION 
+        self.comm = CommunicationManager(self.robot, self.id)
+
+        # PATH PLANNING 
+        self.map = get_map()
+        self.astar = AStarPlanner()
+        self.dwa = DWA()
+        self.path = []
+        self.current_wp = None
 
         # FSM 
         self.state = "IDLE"
         self.current_task = None
-        self.path = []
-        self.waypoint_idx = 0
+        self.last_idle_broadcast = 0.0
 
-        # Navigation 
-        self.map = get_map()
-        self.astar = AStarPlanner()
-        self.dwa = DWA()
+        print(f"[Collector {self.id}] READY.")
 
-        # For smooth DWA behaviour
-        self.prev_cmd = (0.0, 0.0)
-
-        print(f"[Collector] READY | ID = {self.robot_id}")
-
-
-    # helpers 
-
-    def yaw(self):
+   
+    # HELPERS
+    
+    def get_yaw(self):
         _, _, y = self.imu.getRollPitchYaw()
         return y
 
-    def get_obstacles(self):
+    def world_to_robot(self, dx, dz, yaw):
+        rx = dx * math.cos(-yaw) - dz * math.sin(-yaw)
+        rz = dx * math.sin(-yaw) + dz * math.cos(-yaw)
+        return rx, rz
+
+    def set_wheel_speeds(self, v, w):
+        wl = (v - 0.5 * w * AXLE_LENGTH) / WHEEL_RADIUS
+        wr = (v + 0.5 * w * AXLE_LENGTH) / WHEEL_RADIUS
+        limit = min(self.lm.getMaxVelocity(), self.rm.getMaxVelocity())
+        wl = max(-limit, min(limit, wl))
+        wr = max(-limit, min(limit, wr))
+        self.lm.setVelocity(wl)
+        self.rm.setVelocity(wr)
+
+    def at_waypoint(self, tx, tz):
+        x, _, z = self.gps.getValues()
+        return math.hypot(tx - x, tz - z) < WAYPOINT_TOL
+
+    
+    # FSM STATES
+     
+    # IDLE -
+    def state_idle(self):
+        now = self.robot.getTime()
+
+        if now - self.last_idle_broadcast > 5:
+            self.comm.send_status("idle")
+            self.last_idle_broadcast = now
+            print(f"[{self.id}] Broadcasting IDLE...")
+
+        msg = self.comm.receive()
+        if msg and "task" in msg:
+            print(f"[{self.id}] Received task → {msg}")
+            self.current_task = msg
+            self.state = "GETTING_PATH"
+
+    # GETTING PATH 
+    def state_getting_path(self):
+        x, _, z = self.gps.getValues()
+        tx, tz = self.current_task["pos"]
+
+        start = self.map.world_to_grid(x, z)
+        goal = self.map.world_to_grid(tx, tz)
+
+        path_cells = self.astar.plan(self.map, start, goal)
+        if not path_cells:
+            print(f"[{self.id}] No path found!")
+            self.state = "IDLE"
+            return
+
+        self.path = [self.map.grid_to_world(r, c) for r, c in path_cells]
+        self.current_wp = self.path.pop(0)
+
+        print(f"[{self.id}] Path planned → {len(self.path)} waypoints.")
+
+        self.state = "GOING_TO_TRASH"
+
+    #  GOING TO TRASH 
+    def state_going_to_trash(self):
+        x, _, z = self.gps.getValues()
+        yaw = self.get_yaw()
+
+        tx, tz = self.current_wp
+
+        dx, dz = (tx - x), (tz - z)
+        gx, gy = self.world_to_robot(dx, dz, yaw)
+
+        # LIDAR PROCESSING
         ranges = self.lidar.getRangeImage()
-        obs = []
         hfov = self.lidar.getFov()
-        res = self.lidar.getHorizontalResolution()
+        n = len(ranges)
+
+        obs = []
         for i, r in enumerate(ranges):
             if r == float("inf") or r <= 0.03:
                 continue
-            a = -hfov/2 + hfov * (i / (res - 1))
+            a = -hfov/2 + hfov * (i/(n-1))
             obs.append((r*math.cos(a), r*math.sin(a)))
-        return obs
-    
-    def drive(self, v, w):
-        R = 0.033
-        L = 0.160
-        wl = (v - 0.5*w*L) / R
-        wr = (v + 0.5*w*L) / R
-        max_w = min(self.left_motor.getMaxVelocity(),
-                    self.right_motor.getMaxVelocity())
-        wl = max(-max_w, min(max_w, wl))
-        wr = max(-max_w, min(max_w, wr))
-        self.left_motor.setVelocity(wl)
-        self.right_motor.setVelocity(wr)
 
-    
-    #  FSM STATES
+        v, w = self.dwa.get_safe_velocities(obs, (gx, gy))
+        self.set_wheel_speeds(v, w)
+
+        # Reached waypoint
+        if self.at_waypoint(tx, tz):
+            if self.path:
+                self.current_wp = self.path.pop(0)
+            else:
+                print(f"[{self.id}] Trash reached!")
+                self.comm.send_event("collected", self.current_task["id"])
+
+                # Now plan to go to BIN
+                self.current_task = {"id": "BIN", "pos": (5.5, -2.5)}
+                self.state = "GETTING_PATH"
+
+    # GOING TO BIN 
+    def state_going_to_bin(self):
+        self.state_going_to_trash()   # identical motion logic
+
+        # BIN handled by supervisor touch sensor
+
+   
+    # MAIN LOOP
     
     def run(self):
-
-        broadcast_timer = 0
-
-        while self.step(self.ts) != -1:
-
-            # STATE: IDLE 
+        while self.robot.step(self.ts) != -1:
             if self.state == "IDLE":
-                
-                # Broadcast idle every 4 seconds
-                if self.getTime() - broadcast_timer > 4:
-                    self.comm.send({
-                        "event": "idle",
-                        "collector_id": self.robot_id
-                    })
-                    broadcast_timer = self.getTime()
-                    print("[Collector] Broadcasting idle…")
-                msg = self.comm.receive()
+                self.state_idle()
 
-                if msg and msg.get("event") == "assign_task":
-                    if msg["collector_id"] == self.robot_id:
-                        print("[Collector] Task received from dispatcher:", msg)
-                        self.current_task = msg
-                        self.state = "GETTING_PATH"
-
-
-            # STATE: GETTING_PATH 
             elif self.state == "GETTING_PATH":
+                self.state_getting_path()
 
-                cx, _, cz = self.gps.getValues()
-                tx, tz = self.current_task["task_pos"]
-
-                start = self.map.world_to_grid(cx, cz)
-                goal = self.map.world_to_grid(tx, tz)
-
-                path_idxs = self.astar.plan(self.map, start, goal)
-
-                if not path_idxs:
-                    print("[Collector] ERROR: No path found!")
-                    self.state = "IDLE"
-                    continue
-
-                self.path = [self.map.grid_to_world(r, c) for r, c in path_idxs]
-                self.waypoint_idx = 0
-
-                print("[Collector] Path planned with", len(self.path), "waypoints")
-                self.state = "GOING_TO_TRASH"
-
-
-            # STATE: GOING_TO_TRASH 
             elif self.state == "GOING_TO_TRASH":
+                self.state_going_to_trash()
 
-                if self.waypoint_idx >= len(self.path):
-                    print("[Collector] Arrived at trash!")
-                    
-                    # Notify supervisor to despawn trash
-                    self.comm.send({
-                        "event": "collected",
-                        "task_id": self.current_task["task_id"]
-                    })
-
-                    # Now go to bin
-                    self.current_task = {
-                        "task_pos": (0.0, 0.0)  # CHANGE BIN POSITION HERE
-                    }
-                    self.state = "GETTING_PATH"
-                    continue
-
-                # Navigation
-                gx, gz = self.path[self.waypoint_idx]
-                cx, _, cz = self.gps.getValues()
-
-                dx = gx - cx
-                dz = gz - cz
-                yaw = self.yaw()
-
-                # Transform goal to robot frame
-                rx = dx * math.cos(-yaw) - dz * math.sin(-yaw)
-                ry = dx * math.sin(-yaw) + dz * math.cos(-yaw)
-
-                if math.hypot(dx, dz) < 0.15:
-                    self.waypoint_idx += 1
-                    continue
-
-                obs = self.get_obstacles()
-                v, w = self.dwa.get_safe_velocities(obs, (rx, ry),
-                                                     prev_cmd=self.prev_cmd,
-                                                     cur=self.prev_cmd)
-                self.prev_cmd = (v, w)
-                self.drive(v, w)
-
-
-            # STATE: GOING_TO_BIN -
             elif self.state == "GOING_TO_BIN":
-                pass
+                self.state_going_to_bin()
 
 
 
-# MAIN
+# RUN
 if __name__ == "__main__":
-    bot = Collector()
+    bot = CollectorBot("Collector_1")
     bot.run()
+
