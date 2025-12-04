@@ -2,12 +2,10 @@
 # Implemented by: Abdullateef Vahora
 
 def is_trash_visible(camera):
-    """
-    Analyzes the camera's view for a cluster of blue pixels.
-    """
+    """Analyses the camera's view for a cluster of blue pixels."""
     image_data = camera.getImageArray()
     
-    # Camera Check & Get Real Dimensions ---
+    # Camera Check and Get Real Dimensions
     try:
         actual_height = len(image_data)
         actual_width = len(image_data[0])
@@ -26,9 +24,7 @@ def is_trash_visible(camera):
     current_cluster_count = 0
 
     def _is_pixel_blue(y, x):
-        """
-        Checks if a single pixel at (y, x) matches the "blue" criteria.
-        """
+        """Checks if a single pixel at (y, x) matches the "blue" criteria."""
         try:
             R, G, B = image_data[y][x]
             
@@ -65,7 +61,7 @@ def is_trash_visible(camera):
         visited.add((y, x))
         
         if not _is_pixel_blue(y, x):
-            return  # Not blue, stop this path
+            return
         
         # This is a valid blue pixel
         current_cluster_count += 1

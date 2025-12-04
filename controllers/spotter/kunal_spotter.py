@@ -1,71 +1,129 @@
+"""
+Spotter controller
+"""
+
 from controller import Robot
-from shared_libraries.communication import Communication
-from shared_libraries.navigation import NavigationLibrary
-from shared_libraries.vision import Vision
+import math
+import time
+import vision           
+from lib_shared.communication import Communication
+
 
 class Spotter(Robot):
     def __init__(self):
         super().__init__()
+        self.timestep = int(self.getBasicTimeStep())
 
-        self.comm = Communication(self, channel=1)
-        self.nav = NavigationLibrary(self)
-        self.vision = Vision(self)
+        # Devices
+        self.camera = self.getDevice("camera")
+        self.camera.enable(self.timestep)
 
-        self.tasks_to_assign = []
-        self.idle_collectors = []
+        self.gps = self.getDevice("gps")
+        self.gps.enable(self.timestep)
 
-    def dispatch_tasks(self):
+        self.imu = self.getDevice("inertial unit")
+        self.imu.enable(self.timestep)
 
-        if not self.tasks_to_assign or not self.idle_collectors:
-            return  # Nothing to assign
+        # Wheels 
+        self.left = self.getDevice("left wheel motor")
+        self.right = self.getDevice("right wheel motor")
+        self.left.setPosition(float("inf"))
+        self.right.setPosition(float("inf"))
+        self.left.setVelocity(0.0)
+        self.right.setVelocity(0.0)
+
+        # Communication 
+        self.comm = Communication(self, channel=1, verbose=True)
+        self.spotter_id = f"spotter_{int(self.getTime() * 1000) % 9999}"
+
+        # Simple patrol waypoints (in world coordinates x,z) (adjusting)
+        self.waypoints = [
+            (0.5, 0.0),
+            (0.5, 1.0),
+            (-0.8, 1.0),
+            (-0.8, 0.0)
+        ]
+        self.wp_index = 0
+
+        # Trash detection 
+        self.task_counter = 0
+        self.cooldown = 2.0  # seconds between reports
+        self.last_report_time = -10.0
         
-        # Pop one task + nearest collector
-        task = self.tasks_to_assign.pop(0)
-        robot_id = self.idle_collectors.pop(0)
 
-        # Send assignment
-        self.comm.send({
-            "event": "assign_task",
-            "collector_id": robot_id,
-            "task_pos": task["pos"],
-            "task_id": task["id"]
-        })
+    def get_pose(self):
+        gx, _, gz = self.gps.getValues()
+        r, p, y = self.imu.getRollPitchYaw()
+        return gx, gz, y
 
-        print(f"[DISPATCH] Assigned {task['id']} to {robot_id}")
+    def go_to_waypoint(self, tx, tz) -> bool:
+        """Very simple P-controller to steer towards (tx, tz). Returns True if close enough."""
+        x, z, th = self.get_pose()
+        dx, dz = (tx - x), (tz - z)
+        dist = math.hypot(dx, dz)
+
+        if dist < 0.15:
+            self.left.setVelocity(0.0)
+            self.right.setVelocity(0.0)
+            return True
+
+        # heading error
+        target_th = math.atan2(dz, dx)
+        e = (target_th - th + math.pi) % (2 * math.pi) - math.pi
+
+        v = 4.0           # base wheel speed (rad/s in motor units)
+        w = 6.0 * e       # steer gain
+
+        wl = v - w
+        wr = v + w
+
+        max_vel = min(self.left.getMaxVelocity(), self.right.getMaxVelocity())
+        wl = max(-max_vel, min(max_vel, wl))
+        wr = max(-max_vel, min(max_vel, wr))
+
+        self.left.setVelocity(wl)
+        self.right.setVelocity(wr)
+        return False
+
+   
+    def detect_and_report(self):
+        now = self.getTime()
+        if now - self.last_report_time < self.cooldown:
+            return
+
+        if vision.is_trash_visible(self.camera):
+            x, z, _ = self.get_pose()
+            self.task_counter += 1
+            task_id = f"t_{self.task_counter}"
+
+            msg = {
+                "event": "trash_spotted",
+                "task_id": task_id,
+                "pos": [x, z],
+                "spotter_id": self.spotter_id
+            }
+
+            print(f"[SPOTTER] Trash detected at ({x:.2f}, {z:.2f}) -> task {task_id}")
+            self.comm.send(msg)
+            self.last_report_time = now
+
 
     def run(self):
-        timestep = int(self.getBasicTimeStep())
+        print("[SPOTTER] Controller started.")
+        while self.step(self.timestep) != -1:
+            # Move along patrol waypoints
+            tx, tz = self.waypoints[self.wp_index]
+            reached = self.go_to_waypoint(tx, tz)
+            if reached:
+                self.wp_index = (self.wp_index + 1) % len(self.waypoints)
 
-        while self.step(timestep) != -1:
+            # Check for trash and report if visible
+            self.detect_and_report()
 
-            # 1. Receive messages
-            msg = self.comm.receive()
-            if msg:
 
-                # A collector reports it is idle
-                if msg.get("event") == "idle":
-                    self.idle_collectors.append(msg["collector_id"])
+if __name__ == "__main__":
+    spotter = Spotter()
+    spotter.run()
 
-                # A collector reports a completed task
-                if msg.get("event") == "collected":
-                    print("[SPOTTER] Task completed:", msg)
-
-            # 2. Camera check
-            trash = self.vision.detect_trash()
-            if trash:
-                trash_id, pos = trash
-                self.tasks_to_assign.append({"id": trash_id, "pos": pos})
-                self.comm.send({
-                    "event": "trash_found",
-                    "trash_id": trash_id,
-                    "pos": pos
-                })
-                print("[SPOTTER] Found trash:", trash_id)
-
-            # 3. Dispatch tasks
-            self.dispatch_tasks()
-
-            # 4. Continue movement
-            self.nav.update_odometry()
             
 

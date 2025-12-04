@@ -60,9 +60,9 @@ performance in a simple, controlled environmen
 ## **Kunal**
 
 **Communication**
-- [ ]  Implement Emitter + Receiver wrappers, define message formats
-- [ ]  Emit `trash_found(x, y)` via comms API
-- [ ]  Listen for `trash_found` and `im_idle`
+- [x]  Implement Emitter + Receiver wrappers, define message formats
+- [x]  Emit `trash_found(x, y)` via comms API
+- [x]  Listen for `trash_found` and `im_idle`
 - [ ]  Allocate tasks & Emit `go_to_task` to collectors
 
 ---
