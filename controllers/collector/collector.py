@@ -126,6 +126,8 @@ class Collector(Robot):
 
     def plan_path_to_goal(self, gx, gz):
         """Uses A* to find a path from current rx,rz to gx,gz."""
+        print(f"[A*] Planning from ({self.rx:.2f}, {self.rz:.2f}) to ({gx:.2f}, {gz:.2f})")
+        
         def valid_node(node):
             if self.plan_grid.is_free(*node): return node
             # BFS to find nearest free node
@@ -143,7 +145,7 @@ class Collector(Robot):
         goal_node = valid_node(self.plan_grid.world_to_grid(gx, gz))
         
         if not start_node or not goal_node:
-            print("Plan failed: Start or Goal invalid")
+            print("Plan failed: Start or Goal invalid (off-grid or obstacle)")
             return False
 
         nodes = self.astar.plan(self.plan_grid, start_node, goal_node)
@@ -223,7 +225,7 @@ class Collector(Robot):
         return True # Still moving
 
     def run(self):
-        print("Collector Agent Started. Waiting for tasks...")
+        print(f"Collector {self.robot_id} Started (Auction Mode).")
         
         while self.step(self.timestep) != -1:
             self.update_pose() # Always update sensors
@@ -231,39 +233,56 @@ class Collector(Robot):
             # --- Check Communication --- #
             msg = self.comm.receive()
             if msg:
-                # Filter for tasks assigned to this specific robot
-                if msg.get("event") == "assign_task" and msg.get("collector_id") == self.robot_id:
-                    print(f"Task Received: {msg}")
+                # 1. Handle Auction
+                if msg.get("event") == "auction_start":
+                    if self.state == "IDLE":
+                        task_id = msg["task_id"]
+                        tx, tz = msg["pos"]
+                        
+                        # Bid Cost = Simple Distance
+                        cost = math.hypot(tx - self.rx, tz - self.rz)
+                        
+                        self.comm.send({
+                            "event": "bid",
+                            "task_id": task_id,
+                            "collector_id": self.robot_id,
+                            "cost": cost
+                        })
+                        print(f"[AUCTION] Bidding {cost:.2f} on task {task_id}")
+
+                # 2. Handle Awarded Task
+                elif msg.get("event") == "assign_task" and msg.get("collector_id") == self.robot_id:
+                    print(f"[TASK] Won auction for task {msg.get('task_id')}")
                     
-                    # EXTRACT COORDINATES FROM MSG HERE
-                    target_x = msg.get("target_x", 3.5) 
-                    target_z = msg.get("target_z", 2.0)
+                    target_x = msg.get("target_x") 
+                    target_z = msg.get("target_z")
                     
-                    # Plan path
+                    # Use the REAL A* planner
                     success = self.plan_path_to_goal(target_x, target_z)
-                    if success: self.state = "NAVIGATING"
-                    else: print("Could not plan path to task location.")
+                    if success: 
+                        self.state = "NAVIGATING"
+                    else: 
+                        print("Could not plan path to task. Remaining IDLE.")
 
             # --- Finite State Machine ---
             if self.state == "IDLE":
                 self.stop_motors()
-                # Periodically send status (every ~1 second)
                 if self.getTime() % 1.0 < 0.1: 
                     self.send_idle_status()
 
             elif self.state == "NAVIGATING":
-                # Execute move logic
                 is_moving = self.update_navigation()
                 
                 if not is_moving:
-                    print("Target Reached.")
-                    # Task complete? Go back to IDLE or switch to PICKUP
-                    self.state = "IDLE" # For now, back to IDLE
+                    print("Task Complete (Target Reached).")
                     
-            elif self.state == "GO_TO_TRASH":
-                # Legacy state name handling if needed
-                self.state = "NAVIGATING"
+                    # Notify Supervisor/Spotter
+                    self.comm.send({
+                        "event": "collected",
+                        "collector_id": self.robot_id
+                    })
+                    
+                    self.state = "IDLE"
 
 if __name__ == "__main__":
-    agent = Collector()
-    agent.run()
+    Collector().run()
