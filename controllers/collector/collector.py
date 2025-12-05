@@ -9,7 +9,7 @@ if os.path.dirname(os.path.dirname(__file__)) not in sys.path:
 from lib_shared.communication import Communication
 from lib_shared.global_planner import AStarPlanner
 from lib_shared.map_module import visualise_robot_on_map, get_map
-from lib_shared.local_planner import DWA, _ang
+from lib_shared.local_planner import DWA, _wrap
 
 WHEEL_RADIUS = 0.033
 AXLE_LENGTH = 0.16
@@ -53,7 +53,7 @@ class Collector(Robot):
     def __init__(self):
         super().__init__()
         self.timestep = int(self.getBasicTimeStep())
-        self.robot_id = "collector_1"
+        self.robot_id =  self.getName() 
         self.state = "IDLE"
         
         self.comm = Communication(self, channel=1) # init comm
@@ -203,11 +203,11 @@ class Collector(Robot):
         else:
             # Calculate distance and angle
             dist = math.hypot(gx_r, gy_r)
-            ang = _ang(math.atan2(gy_r, gx_r))
+            ang = _wrap(math.atan2(gy_r, gx_r))
             
             v = 0.5 * dist
             w = -1.5 * ang # Increased angular gain for snappier turns
-            
+    
             # Clamp limits
             v = max(-0.35, min(0.35, v))
             w = max(-2.0, min(2.0, w))
@@ -235,34 +235,36 @@ class Collector(Robot):
             if msg:
                 # 1. Handle Auction
                 if msg.get("event") == "auction_start":
-                    if self.state == "IDLE":
-                        task_id = msg["task_id"]
-                        tx, tz = msg["pos"]
+                    if self.state == "IDLE": # Only bid if free
+                        task_id = msg.get("task_id")
+                        tx, tz = msg.get("pos")
                         
-                        # Bid Cost = Simple Distance
+                        # Calculate BID (Cost = Distance)
                         cost = math.hypot(tx - self.rx, tz - self.rz)
                         
                         self.comm.send({
                             "event": "bid",
-                            "task_id": task_id,
                             "collector_id": self.robot_id,
+                            "task_id": task_id,
                             "cost": cost
                         })
-                        print(f"[AUCTION] Bidding {cost:.2f} on task {task_id}")
+                        print(f"-> Bidding {cost:.2f} on Task {task_id}")
 
                 # 2. Handle Awarded Task
                 elif msg.get("event") == "assign_task" and msg.get("collector_id") == self.robot_id:
-                    print(f"[TASK] Won auction for task {msg.get('task_id')}")
+                    print(f"*** WON TASK {msg.get('task_id')}! ***")
                     
                     target_x = msg.get("target_x") 
                     target_z = msg.get("target_z")
+                    self.current_task_id = msg.get("task_id")
                     
-                    # Use the REAL A* planner
+                    # Use original A* planner
                     success = self.plan_path_to_goal(target_x, target_z)
                     if success: 
                         self.state = "NAVIGATING"
                     else: 
-                        print("Could not plan path to task. Remaining IDLE.")
+                        print("Planning failed. Remaining IDLE.")
+
 
             # --- Finite State Machine ---
             if self.state == "IDLE":

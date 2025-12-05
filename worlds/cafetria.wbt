@@ -4,19 +4,11 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/Floor.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/Parquetry.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/lights/protos/CeilingSpotLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/lights/protos/CeilingLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/apartment_structure/protos/Wall.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/Roughcast.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/apartment_structure/protos/Window.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/MattePaint.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/apartment_structure/protos/Door.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/plants/protos/PottedTree.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/cabinet/protos/Cabinet.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/cabinet/protos/CabinetHandle.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/tables/protos/Table.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/VarnishedPine.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/living_room_furniture/protos/Sofa.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/chairs/protos/Chair.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/robotis/turtlebot/protos/TurtleBot3Burger.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/devices/robotis/protos/RobotisLds01.proto"
@@ -25,17 +17,20 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 
 WorldInfo {
   info [
-    "An office break room, surrounded by office desks."
-    "This world contains the domestic objects included in Webots."
-    "Doors are interactive."
-    "This means that a robot could open a drawer, leave an object inside it, and close it."
+    "A cafeteria with serving counter and dining tables."
+    "Robots can navigate through the space."
   ]
   title "cafeteria"
 }
 Viewpoint {
-  orientation 0.5846726932284633 -0.5194198251361185 -0.6231860773866336 4.15284703091977
-  position 0.41603475570311144 -0.5406521419140622 25.88204558121108
+  orientation 0.46536164164053956 -0.5828196045184247 -0.6661530237705215 4.532192929395498
+  position 1.3414262669998862 -10.409105012622565 35.72022024227763
 }
+
+# ============================================================================
+# ENVIRONMENT - Background, Lighting, Floor
+# ============================================================================
+
 TexturedBackground {
   texture "entrance_hall"
   luminosity 0.5
@@ -45,9 +40,7 @@ TexturedBackgroundLight {
   texture "entrance_hall"
 }
 Floor {
-  translation 0.243 0.93 0
-  rotation 0 0 1 1.5708
-  size 7.7 12.86
+  size 8 13
   appearance Parquetry {
     type "light strip"
     textureTransform TextureTransform {
@@ -56,16 +49,394 @@ Floor {
     }
   }
 }
-TurtleBot3Burger {
-  hidden position_0_0 4.3498236595393665e-11
-  hidden position_0_1 9.370854227828473e-12
-  hidden position_0_2 -4.6569012492773593e-07
-  hidden position2_0_2 2.0374961415803174e-06
-  hidden position3_0_2 -2.704937677831053e-10
-  hidden rotation_12 -0.22285125452735702 0.9748524511653883 -0.00012966270643561685 2.0880775517945473e-06
-  hidden rotation_14 -4.18302394634665e-06 -0.9999999911169851 0.00013322361601910267 4.074970396790544e-06
-  translation 0.5378285984036523 2.4787194261575407 -0.00024773920601001836
-  rotation -0.002822791097025711 -0.2824023077608375 -0.9592919099115638 0
+
+# ============================================================================
+# WALLS - Perimeter and Counter
+# ============================================================================
+
+Wall {
+  translation -4 0 0
+  name "wall_west"
+  size 0.06 13 2.5
+  appearance NULL
+}
+Wall {
+  translation 4 0 0
+  name "wall_east"
+  size 0.06 13 2.5
+  appearance NULL
+}
+Wall {
+  translation 0 -6.5 0
+  rotation 0 0 1 1.5708
+  name "wall_south"
+  size 0.06 8 2.5
+  appearance NULL
+}
+Wall {
+  translation 0 6.5 0
+  rotation 0 0 1 1.5708
+  name "wall_north"
+  size 0.06 8 2.5
+  appearance NULL
+}
+
+# ============================================================================
+# CEILING LIGHTS
+# ============================================================================
+
+CeilingLight {
+  translation -2 -4 2.5
+  bulbColor 0.91 0.72 0.43
+  supportColor 0.53 0.54 0.52
+  pointLightColor 0.91 0.72 0.43
+  pointLightIntensity 3
+  pointLightCastShadows TRUE
+}
+CeilingLight {
+  translation -2 0 2.5
+  name "ceiling_light_1"
+  bulbColor 0.91 0.72 0.43
+  supportColor 0.53 0.54 0.52
+  pointLightColor 0.91 0.72 0.43
+  pointLightIntensity 3
+  pointLightCastShadows TRUE
+}
+CeilingLight {
+  translation -2 4 2.5
+  name "ceiling_light_2"
+  bulbColor 0.91 0.72 0.43
+  supportColor 0.53 0.54 0.52
+  pointLightColor 0.91 0.72 0.43
+  pointLightIntensity 3
+  pointLightCastShadows TRUE
+}
+CeilingLight {
+  translation 2 -4 2.5
+  name "ceiling_light_3"
+  bulbColor 0.91 0.72 0.43
+  supportColor 0.53 0.54 0.52
+  pointLightColor 0.91 0.72 0.43
+  pointLightIntensity 3
+  pointLightCastShadows TRUE
+}
+CeilingLight {
+  translation 2 0 2.5
+  name "ceiling_light_4"
+  bulbColor 0.91 0.72 0.43
+  supportColor 0.53 0.54 0.52
+  pointLightColor 0.91 0.72 0.43
+  pointLightIntensity 3
+  pointLightCastShadows TRUE
+}
+CeilingLight {
+  translation 2 4 2.5
+  name "ceiling_light_5"
+  bulbColor 0.91 0.72 0.43
+  supportColor 0.53 0.54 0.52
+  pointLightColor 0.91 0.72 0.43
+  pointLightIntensity 3
+  pointLightCastShadows TRUE
+}
+
+# ============================================================================
+# DINING AREA - Tables and Chairs (Grouped by Table)
+# ============================================================================
+
+# Table 0 - Left Column, Back Row (at -2.5, -4)
+Table {
+  translation -2.5 -4 0
+  size 1 1.6 0.74
+  feetSize 0.05 0.05
+  legAppearance MattePaint {
+    baseColor 0.2 0.2 0.2
+  }
+}
+Chair {
+  translation -2.5 -4.8 0
+  rotation 0 0 1 1.5708
+}
+Chair {
+  translation -2.5 -3.2 0
+  rotation 0 0 1 -1.5708
+  name "chair_1"
+}
+Chair {
+  translation -3 -4 0
+  name "chair_2"
+}
+Chair {
+  translation -2 -4 0
+  rotation 0 0 1 3.14159
+  name "chair_3"
+}
+
+# Table 1 - Center Column, Back Row (at 0, -4)
+Table {
+  translation 0 -4 0
+  name "table_1"
+  size 1 1.6 0.74
+  feetSize 0.05 0.05
+  legAppearance MattePaint {
+    baseColor 0.2 0.2 0.2
+  }
+}
+Chair { translation 0 -4.8 0 rotation 0 0 1 1.5708 name "chair_4" }
+Chair { translation 0 -3.2 0 rotation 0 0 1 -1.5708 name "chair_5"}
+Chair {translation -0.5 -4 0 name "chair_6"}
+Chair { translation 0.5 -4 0 rotation 0 0 1 3.14159 name "chair_7"}
+
+# Table 2 - Right Column, Back Row (at 2.5, -4)
+Table {
+  translation 2.5 -4 0
+  name "table_2"
+  size 1 1.6 0.74
+  feetSize 0.05 0.05
+  legAppearance MattePaint {
+    baseColor 0.2 0.2 0.2
+  }
+}
+Chair { translation 2.5 -4.8 0 rotation 0 0 1 1.5708 name "chair_8" }
+
+Chair {
+  translation 2.5 -3.2 0
+  rotation 0 0 1 -1.5708
+  name "chair_9"
+}
+Chair {
+  translation 2 -4 0
+  name "chair_10"
+}
+Chair {
+  translation 3 -4 0
+  rotation 0 0 1 3.14159
+  name "chair_11"
+}
+
+# Table 3 - Left Column, Middle Row (at -2.5, -1.5)
+Table {
+  translation -2.5 -1.5 0
+  name "table_3"
+  size 1 1.6 0.74
+  feetSize 0.05 0.05
+  legAppearance MattePaint {
+    baseColor 0.2 0.2 0.2
+  }
+}
+Chair {
+  translation -2.5 -2.3 0
+  rotation 0 0 1 1.5708
+  name "chair_12"
+}
+Chair {
+  translation -2.5 -0.7 0
+  rotation 0 0 1 -1.5708
+  name "chair_13"
+}
+Chair {
+  translation -3 -1.5 0
+  name "chair_14"
+}
+Chair {
+  translation -2 -1.5 0
+  rotation 0 0 1 3.14159
+  name "chair_15"
+}
+
+# Table 4 - Center Column, Middle Row (at 0, -1.5)
+Table {
+  translation 0 -1.5 0
+  name "table_4"
+  size 1 1.6 0.74
+  feetSize 0.05 0.05
+  legAppearance MattePaint {
+    baseColor 0.2 0.2 0.2
+  }
+}
+Chair {
+  translation 0 -2.3 0
+  rotation 0 0 1 1.5708
+  name "chair_16"
+}
+Chair {
+  translation 0 -0.7 0
+  rotation 0 0 1 -1.5708
+  name "chair_17"
+}
+Chair {
+  translation -0.5 -1.5 0
+  name "chair_18"
+}
+Chair {
+  translation 0.5 -1.5 0
+  rotation 0 0 1 3.14159
+  name "chair_19"
+}
+
+# Table 5 - Right Column, Middle Row (at 2.5, -1.5)
+Table {
+  translation 2.5 -1.5 0
+  name "table_5"
+  size 1 1.6 0.74
+  feetSize 0.05 0.05
+  legAppearance MattePaint {
+    baseColor 0.2 0.2 0.2
+  }
+}
+Chair {
+  translation 2.5 -2.3 0
+  rotation 0 0 1 1.5708
+  name "chair_20"
+}
+Chair {
+  translation 2.5 -0.7 0
+  rotation 0 0 1 -1.5708
+  name "chair_21"
+}
+Chair {
+  translation 2 -1.5 0
+  name "chair_22"
+}
+Chair {
+  translation 3 -1.5 0
+  rotation 0 0 1 3.14159
+  name "chair_23"
+}
+
+# Table 6 - Left Column, Front Row (at -2.5, 1)
+Table {
+  translation -2.5 1 0
+  name "table_6"
+  size 1 1.6 0.74
+  feetSize 0.05 0.05
+  legAppearance MattePaint {
+    baseColor 0.2 0.2 0.2
+  }
+}
+Chair {
+  translation -2.5 0.2 0
+  rotation 0 0 1 1.5708
+  name "chair_24"
+}
+Chair {
+  translation -2.5 1.8 0
+  rotation 0 0 1 -1.5708
+  name "chair_25"
+}
+Chair {
+  translation -3 1 0
+  name "chair_26"
+}
+Chair {
+  translation -2 1 0
+  rotation 0 0 1 3.14159
+  name "chair_27"
+}
+
+# Table 7 - Center Column, Front Row (at 0, 1)
+Table {
+  translation 0 1 0
+  name "table_7"
+  size 1 1.6 0.74
+  feetSize 0.05 0.05
+  legAppearance MattePaint {
+    baseColor 0.2 0.2 0.2
+  }
+}
+Chair {
+  translation 0 0.2 0
+  rotation 0 0 1 1.5708
+  name "chair_28"
+}
+Chair {
+  translation 0 1.8 0
+  rotation 0 0 1 -1.5708
+  name "chair_29"
+}
+Chair {
+  translation -0.5 1 0
+  name "chair_30"
+}
+Chair {
+  translation 0.5 1 0
+  rotation 0 0 1 3.14159
+  name "chair_31"
+}
+
+# Table 8 - Right Column, Front Row (at 2.5, 1)
+Table {
+  translation 2.5 1 0
+  name "table_8"
+  size 1 1.6 0.74
+  feetSize 0.05 0.05
+  legAppearance MattePaint {
+    baseColor 0.2 0.2 0.2
+  }
+}
+Chair {
+  translation 2.5 0.2 0
+  rotation 0 0 1 1.5708
+  name "chair_32"
+}
+Chair {
+  translation 2.5 1.8 0
+  rotation 0 0 1 -1.5708
+  name "chair_33"
+}
+Chair {
+  translation 2 1 0
+  name "chair_34"
+}
+Chair {
+  translation 3 1 0
+  rotation 0 0 1 3.14159
+  name "chair_35"
+}
+
+# ============================================================================
+# ROBOTS - Collectors and Agents
+# ============================================================================
+
+DEF collector_1 TurtleBot3Burger {
+  hidden position_0_0 -1.599780726642333e-11
+  hidden position_0_1 1.2301781105180268e-11
+  hidden position_0_2 1.0372630319958328e-06
+  hidden position2_0_2 0.0002183094467052993
+  hidden position3_0_2 -3.2745598527583087e-07
+  hidden linearVelocity_0 -5.956888110207903e-17 -1.4997415353134913e-15 -5.938609979156616e-17
+  hidden angularVelocity_0 2.7641338094438885e-15 -1.5623729542686597e-15 6.30808352106158e-17
+  hidden rotation_14 0.00475112014871196 0.9999875892135967 -0.0014994252604292998 0.00021831215635787299
+  translation 0.5000000004954359 2.4999999994794075 -0.00024773920598919474
+  rotation -0.0021116496069960486 -0.9999977704541836 4.753900379751254e-06 0.004641946780161626
+  name "collector_1"
+  controller "collector"
+  extensionSlot [
+    RobotisLds01 {
+    }
+    InertialUnit {
+    }
+    GPS {
+    }
+    Emitter {
+      channel 1
+    }
+    Receiver {
+      channel 1
+    }
+  ]
+}
+DEF collector_2 TurtleBot3Burger {
+  hidden position_0_0 -1.5999627761810158e-11
+  hidden position_0_1 1.229830675159864e-11
+  hidden position_0_2 1.0372210586904027e-06
+  hidden position2_0_2 0.0002183094587905657
+  hidden position3_0_2 -3.2745578396878954e-07
+  hidden linearVelocity_0 -7.783414788034175e-18 4.253660610674605e-15 0
+  hidden angularVelocity_0 -1.1828543839789634e-15 -2.9504808686388538e-16 4.598376766127366e-17
+  hidden rotation_14 0.004750927627357909 0.999987590129755 -0.0014994242776485776 0.00021831216856303478
+  translation 1.500000000495436 1.9999999994794069 -0.00024773920598925026
+  rotation -0.002111649607091905 -0.9999977704541833 4.753898967992099e-06 0.004641946780163167
+  name "collector_2"
   controller "collector"
   extensionSlot [
     RobotisLds01 {
@@ -83,16 +454,20 @@ TurtleBot3Burger {
   ]
 }
 TurtleBot3Burger {
-  hidden position_0_0 -4.342677740636478e-11
-  hidden position_0_1 -2.8891304343966372e-11
-  hidden position_0_2 3.5475658555008027e-09
-  hidden position2_0_2 8.301288177628832e-10
-  hidden position3_0_2 4.4877542271617414e-13
-  hidden rotation_9 0 -1 0 1.5707960001592307
-  hidden rotation_10 -0.7071047811434795 -1.344482790073082e-16 -0.7071087812239586 3.141588
-  translation 3.4999999999981513 1.9290800000096355 -0.0002477392028028963
-  rotation 0.002280284922576165 -0.01907012445895935 0.999815548315684 0.24228484793169755
+  hidden position_0_0 38.67772351616627
+  hidden position_0_1 132.3367053355061
+  hidden position_0_2 -222.87633055487214
+  hidden position2_0_2 0.44698680448853967
+  hidden position3_0_2 302.52191920765665
+  hidden linearVelocity_0 0.1423081031010142 0.04262523328535248 -4.23149881777473e-06
+  hidden angularVelocity_0 -3.456832181709561e-05 -0.00034073495943296974 -1.0739959908369296
+  hidden rotation_9 0 -1 0 0.5921843269112511
+  hidden rotation_10 0.8306657078403644 -4.5064256037009944e-07 0.5567714807871029 3.141597219067106
+  hidden rotation_11 0.8732466545340658 -0.45979374109049664 0.16133814179873163 3.4951263693139545
+  translation 3.683570625039845 -0.11974911957083742 -0.0002455419106496756
+  rotation 0.0013089181926893123 0.17572646855144125 -0.9844381620922689 -0.026606570782854888
   name "HumanAgent"
+  controller "human_agent"
   extensionSlot [
     GPS {
     }
@@ -100,522 +475,13 @@ TurtleBot3Burger {
     }
   ]
 }
-Chair {
-  translation 1 -1.7 0
-  rotation 0 0 1 1.5708
-}
-Chair {
-  translation -1.4 -1.7 0
-  rotation 0 0 1 1.5708
-  name "chair(1)"
-}
-Chair {
-  translation 1 0.2 0
-  rotation 0 0 1 1.5708
-  name "chair(2)"
-}
-Chair {
-  translation 4.5 -1.9 0
-  rotation 0 0 1 1.5708
-  name "chair(4)"
-}
-Chair {
-  translation 4.5 0.1 0
-  rotation 0 0 1 1.5708
-  name "chair(5)"
-}
-Chair {
-  translation 1 -0.9 0
-  rotation 0 0 1 -1.5707953071795862
-  name "chair(6)"
-}
-Chair {
-  translation -1.4 -0.9 0
-  rotation 0 0 1 -1.5707953071795862
-  name "chair(7)"
-}
-Chair {
-  translation 1 1 0
-  rotation 0 0 1 -1.5707953071795862
-  name "chair(8)"
-}
-Chair {
-  translation -1.4 1 0
-  rotation 0 0 1 -1.5707953071795862
-  name "chair(9)"
-}
-Chair {
-  translation 4.5 -1.1 0
-  rotation 0 0 1 -1.5707953071795862
-  name "chair(10)"
-}
-Chair {
-  translation 4.5 0.9 0
-  rotation 0 0 1 -1.5707953071795862
-  name "chair(11)"
-}
-Chair {
-  translation -1.4 0.2 0
-  rotation 0 0 1 1.5708
-  name "chair(3)"
-}
-Sofa {
-  translation 5.5 4 0
-  rotation 2.039929999991511e-06 -2.039929999991511e-06 0.9999999999958387 -1.5707953071795862
-}
-Sofa {
-  translation 3.6 4 0
-  rotation 2.039929999991511e-06 -2.039929999991511e-06 0.9999999999958387 -1.5707953071795862
-  name "sofa(1)"
-}
-Sofa {
-  translation 1.7 4 0
-  rotation 2.039929999991511e-06 -2.039929999991511e-06 0.9999999999958387 -1.5707953071795862
-  name "sofa(2)"
-}
-CeilingSpotLight {
-  translation -1.82 -2.27 2
-  name "ceiling spot light"
-  spotLightColor 0.913725 0.72549 0.431373
-  spotLightIntensity 4
-  spotLightCastShadows TRUE
-}
-CeilingLight {
-  translation 4.78 -0.87 2.5
-  bulbColor 0.913725 0.72549 0.431373
-  supportColor 0.533333 0.541176 0.521569
-  pointLightColor 0.913725 0.72549 0.431373
-  pointLightIntensity 3
-  pointLightCastShadows TRUE
-}
-CeilingLight {
-  translation 4.78 2.74 2.5
-  name "ceiling light(5)"
-  bulbColor 0.913725 0.72549 0.431373
-  supportColor 0.533333 0.541176 0.521569
-  pointLightColor 0.913725 0.72549 0.431373
-  pointLightIntensity 3
-  pointLightCastShadows TRUE
-}
-CeilingLight {
-  translation 0.31 -0.87 2.5
-  name "ceiling light(1)"
-  bulbColor 0.913725 0.72549 0.431373
-  supportColor 0.533333 0.541176 0.521569
-  pointLightColor 0.913725 0.72549 0.431373
-  pointLightIntensity 3
-  pointLightCastShadows TRUE
-}
-CeilingLight {
-  translation 0.31 2.74 2.5
-  name "ceiling light(4)"
-  bulbColor 0.913725 0.72549 0.431373
-  supportColor 0.533333 0.541176 0.521569
-  pointLightColor 0.913725 0.72549 0.431373
-  pointLightIntensity 3
-  pointLightCastShadows TRUE
-}
-CeilingLight {
-  translation -3.52 -0.87 2.5
-  name "ceiling light(2)"
-  bulbColor 0.913725 0.72549 0.431373
-  supportColor 0.533333 0.541176 0.521569
-  pointLightColor 0.913725 0.72549 0.431373
-  pointLightIntensity 3
-  pointLightCastShadows TRUE
-}
-CeilingLight {
-  translation -3.52 2.74 2.5
-  name "ceiling light(3)"
-  bulbColor 0.913725 0.72549 0.431373
-  supportColor 0.533333 0.541176 0.521569
-  pointLightColor 0.913725 0.72549 0.431373
-  pointLightIntensity 3
-  pointLightCastShadows TRUE
-}
-Wall {
-  translation -2.65 0 0
-  size 0.05 5 0.62
-  appearance DEF SMALL_WALLS Roughcast {
-    colorOverride 0.890196 0.803922 1
-    textureTransform TextureTransform {
-      scale 1 2.4
-    }
-  }
-}
-Wall {
-  translation 2.65 -0.77 0
-  name "wall(1)"
-  size 0.05 3.55 0.62
-  appearance USE SMALL_WALLS
-}
-Wall {
-  translation 0 -2.52 0
-  rotation 0 0 1 1.5708
-  name "wall(2)"
-  size 0.05 5.35 0.62
-  appearance USE SMALL_WALLS
-}
-Wall {
-  translation -1.65 2.524 0
-  rotation 0 0 1 1.5708
-  name "wall(3)"
-  size 0.05 2.05 0.62
-  appearance USE SMALL_WALLS
-}
-Wall {
-  translation -0.65 3.05 0
-  rotation 0 0 1 -3.14159
-  name "wall(4)"
-  size 0.05 1 0.62
-  appearance USE SMALL_WALLS
-}
-Wall {
-  translation -6.17 0.92 0
-  name "wall(A)"
-  size 0.06 7.7 2.5
-  appearance DEF SIDE_WALLS Roughcast {
-    textureTransform TextureTransform {
-      scale 3 3
-    }
-  }
-}
-Wall {
-  translation -5.94 -2.9 0
-  rotation 0 0 1 -1.5708003061004252
-  name "wall(B)1"
-  size 0.06 0.4 2.5
-  appearance DEF INTER_WALLS Roughcast {
-    textureTransform TextureTransform {
-      scale 0.3 2.2
-    }
-  }
-}
-Window {
-  translation -5.19 -2.9 0
-  rotation 0 0 1 -1.5708003061004252
-  name "window(B)2"
-  size 0.06 1.1 2.5
-  bottomWallHeight 1
-  frameSize 0.02 0.05 0.02
-  windowSillSize 0.3 0.05
-  frameAppearance DEF WINDOWS_WOOD MattePaint {
-    baseColor 0.133333 0.0666667 0
-  }
-}
-Window {
-  translation -3.84 -2.9 0
-  rotation 0 0 1 -1.5708003061004252
-  name "window(B)3"
-  size 0.06 1.6 2.5
-  bottomWallHeight 1
-  frameSize 0.02 0.05 0.02
-  windowSillSize 0.3 0.05
-  frameAppearance USE WINDOWS_WOOD
-}
-Wall {
-  translation -2.84 -2.9 0
-  rotation 0 0 1 -1.5708003061004252
-  name "wall(B)4"
-  size 0.06 0.4 2.5
-  appearance USE INTER_WALLS
-}
-Window {
-  translation -2.09 -2.9 0
-  rotation 0 0 1 -1.5708003061004252
-  name "window(B)5"
-  size 0.06 1.1 2.5
-  bottomWallHeight 1
-  frameSize 0.02 0.05 0.02
-  windowSillSize 0.3 0.05
-  frameAppearance USE WINDOWS_WOOD
-}
-Window {
-  translation -0.74 -2.9 0
-  rotation 0 0 1 -1.5708003061004252
-  name "window(B)6"
-  size 0.06 1.6 2.5
-  bottomWallHeight 1
-  frameSize 0.02 0.05 0.02
-  windowSillSize 0.3 0.05
-  frameAppearance USE WINDOWS_WOOD
-}
-Wall {
-  translation 0.26 -2.9 0
-  rotation 0 0 1 -1.5708003061004252
-  name "wall(B)7"
-  size 0.06 0.4 2.5
-  appearance USE INTER_WALLS
-}
-Window {
-  translation 1 -2.9 0
-  rotation 0 0 1 -1.5708003061004252
-  name "window(B)8"
-  size 0.06 1.1 2.5
-  bottomWallHeight 1
-  frameSize 0.02 0.05 0.02
-  windowSillSize 0.3 0.05
-  frameAppearance USE WINDOWS_WOOD
-}
-Window {
-  translation 2.35 -2.9 0
-  rotation 0 0 1 -1.5708003061004252
-  name "window(B)9"
-  size 0.06 1.6 2.5
-  bottomWallHeight 1
-  frameSize 0.02 0.05 0.02
-  windowSillSize 0.3 0.05
-  frameAppearance USE WINDOWS_WOOD
-}
-Wall {
-  translation 3.35 -2.9 0
-  rotation 0 0 1 -1.5708003061004252
-  name "wall(B)10"
-  size 0.06 0.4 2.5
-  appearance USE INTER_WALLS
-}
-Window {
-  translation 4.1 -2.9 0
-  rotation 0 0 1 -1.5708003061004252
-  name "window(B)11"
-  size 0.06 1.1 2.5
-  bottomWallHeight 1
-  frameSize 0.02 0.05 0.02
-  windowSillSize 0.3 0.05
-  frameAppearance USE WINDOWS_WOOD
-}
-Window {
-  translation 5.45 -2.9 0
-  rotation 0 0 1 -1.5708003061004252
-  name "window(B)12"
-  size 0.06 1.6 2.5
-  bottomWallHeight 1
-  frameSize 0.02 0.05 0.02
-  windowSillSize 0.3 0.05
-  frameAppearance USE WINDOWS_WOOD
-}
-Wall {
-  translation 6.45 -2.9 0
-  rotation 0 0 1 -1.5708003061004252
-  name "wall(B)13"
-  size 0.06 0.4 2.5
-  appearance USE INTER_WALLS
-}
-Wall {
-  translation 6.68 0.92 0
-  name "wall(C)"
-  size 0.06 7.7 2.5
-  appearance USE SIDE_WALLS
-}
-Wall {
-  translation 3.6 4.8 0
-  rotation 0 0 1 -1.5708003061004252
-  name "wall(D)1"
-  size 0.06 6.2 2.5
-}
-Door {
-  hidden translation_5 0.0017807062579440064 6.345427306703177e-05 5.551115123125783e-16
-  hidden rotation_5 0 0 -1 0.0016434819767908294
-  translation 0 4.8 0
-  rotation 0 0 -1 1.5708
-  size 0.06 1 2.5
-  position -0.0032818804145300145
-  frameSize 0.01 0.05 0.05
-  frameAppearance MattePaint {
-    baseColor 0.133333 0.0666667 0
-  }
-}
-Wall {
-  translation -3.35 4.8 0
-  rotation 0 0 1 -1.5708003061004252
-  name "wall(D)2"
-  size 0.06 5.7 2.5
-}
-PottedTree {
-  translation 2.38 -2.15 0
-}
-PottedTree {
-  translation 6.23 1.42 0
-  name "potted tree(1)"
-}
-Cabinet {
-  hidden position_6_0 -7.482539448681483e-41
-  hidden position_14_0 -7.48253944815259e-41
-  hidden position_22_0 -7.482539447899346e-41
-  hidden position_30_0 -7.48253944742603e-41
-  translation 6.65 -0.7 1.6
-  rotation 0 0 1 3.14159
-  name "cabinet(2)"
-  outerThickness 0.02
-  rowsHeights [
-    0.8
-  ]
-  columnsWidths [
-    0.8, 0.8, 0.8, 0.8
-  ]
-  layout [
-    "Drawer (1, 1, 1, 1, 1.5)"
-    "Drawer (2, 1, 1, 1, 1.5)"
-    "Drawer (3, 1, 1, 1, 1.5)"
-    "Drawer (4, 1, 1, 1, 1.5)"
-    "Shelf (1, 1, 0, 1)"
-    "Shelf (2, 1, 0, 1)"
-    "Shelf (3, 1, 0, 1)"
-  ]
-  handle CabinetHandle {
-    handleColor 0.533333 0.541176 0.521569
-  }
-  primaryAppearance MattePaint {
-    baseColor 0.729412 0.741176 0.713725
-  }
-  secondaryAppearance MattePaint {
-    baseColor 0.666667 0.333333 0
-  }
-}
-Cabinet {
-  translation -6.14 -0.7 1.6
-  name "cabinet(3)"
-  outerThickness 0.02
-  rowsHeights [
-    0.8
-  ]
-  columnsWidths [
-    0.8, 0.8, 0.8, 0.8
-  ]
-  layout [
-    "Drawer (1, 1, 1, 1, 1.5)"
-    "Drawer (2, 1, 1, 1, 1.5)"
-    "Drawer (3, 1, 1, 1, 1.5)"
-    "Drawer (4, 1, 1, 1, 1.5)"
-    "Shelf (1, 1, 0, 1)"
-    "Shelf (2, 1, 0, 1)"
-    "Shelf (3, 1, 0, 1)"
-  ]
-  handle CabinetHandle {
-    handleColor 0.533333 0.541176 0.521569
-  }
-  primaryAppearance MattePaint {
-    baseColor 0.729412 0.741176 0.713725
-  }
-  secondaryAppearance MattePaint {
-    baseColor 0.666667 0.333333 0
-  }
-}
-Table {
-  translation 4.5 0.5 0
-  rotation 0 0 1 1.5708
-  size 1 1.6 0.74
-  feetSize 0.05 0.05
-  trayAppearance DEF TABLE_WOOD VarnishedPine {
-    textureTransform TextureTransform {
-      scale 10 10
-    }
-  }
-  legAppearance MattePaint {
-    baseColor 0.2 0.2 0.2
-  }
-}
-Table {
-  translation 4.5 -1.5 0
-  rotation 0 0 1 -1.6
-  name "table(1)"
-  size 1 1.6 0.74
-  feetSize 0.05 0.05
-  legAppearance MattePaint {
-    baseColor 0.2 0.2 0.2
-  }
-}
-Table {
-  translation 1 -1.3 0
-  rotation 0 0 1 -1.6
-  name "table(9)"
-  size 1 1.6 0.74
-  feetSize 0.05 0.05
-  legAppearance MattePaint {
-    baseColor 0.2 0.2 0.2
-  }
-}
-Table {
-  translation -1.3 -1.3 0
-  rotation 0 0 1 -1.6
-  name "table(10)"
-  size 1 1.6 0.74
-  feetSize 0.05 0.05
-  legAppearance MattePaint {
-    baseColor 0.2 0.2 0.2
-  }
-}
-Table {
-  translation -1.3 0.6 0
-  rotation 0 0 1 -1.6
-  name "table(12)"
-  size 1 1.6 0.74
-  feetSize 0.05 0.05
-  legAppearance MattePaint {
-    baseColor 0.2 0.2 0.2
-  }
-}
-Table {
-  translation 1 0.6 0
-  rotation 0 0 1 -1.6
-  name "table(11)"
-  size 1 1.6 0.74
-  feetSize 0.05 0.05
-  legAppearance MattePaint {
-    baseColor 0.2 0.2 0.2
-  }
-}
-Table {
-  translation -3.18 -1.66 0
-  name "table(2)"
-  size 1 1.6 0.74
-  feetSize 0.05 0.05
-  legAppearance MattePaint {
-    baseColor 0.2 0.2 0.2
-  }
-}
-Table {
-  translation -3.18 0.05 0
-  name "table(5)"
-  feetSize 0.05 0.05
-  legAppearance MattePaint {
-    baseColor 0.2 0.2 0.2
-  }
-}
-Table {
-  translation -3.18 1.86 0
-  name "table(6)"
-  feetSize 0.05 0.05
-  legAppearance MattePaint {
-    baseColor 0.2 0.2 0.2
-  }
-}
-Table {
-  translation -1.77 3.27 0
-  rotation 0 0 1 1.5707996938995747
-  name "table(7)"
-  feetSize 0.05 0.05
-  legAppearance MattePaint {
-    baseColor 0.2 0.2 0.2
-  }
-}
-Table {
-  translation -3.18 3.27 0
-  rotation 0 0 1 1.5707996938995747
-  name "table(8)"
-  size 1 1 0.74
-  feetSize 0.05 0.05
-  legAppearance MattePaint {
-    baseColor 0.2 0.2 0.2
-  }
-}
 E-puck {
-  hidden position_0_0 3.09560411053665e-08
-  hidden position_0_1 3.095611093631755e-08
+  hidden position_0_0 3.100079856774561e-08
+  hidden position_0_1 3.100078959747058e-08
   hidden rotation_1 0 1 0 2.9802322387695313e-08
   hidden rotation_2 0 1 0 2.9802322387695313e-08
-  translation -5.5 -2 -6.3962e-05
-  rotation 0.7701684863618448 0.6378404991959826 1.4160662955453194e-05 6.491314874601324e-09
+  translation -3.0051791155733047 -4.999999999936547 -6.396223925257336e-05
+  rotation 1.8581444863915352e-05 -0.9999999995901788 2.1780087806473804e-05 0.00013149656357798524
   controller "test_sender"
   window "<none>"
   turretSlot [

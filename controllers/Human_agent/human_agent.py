@@ -181,11 +181,6 @@ def main():
         lm.setVelocity(wl)
         rm.setVelocity(wr)
 
-        if int(now * 2.0) % 4 == 0:
-            print(
-                f"[human] wp={idx} v={v:.2f} w={w:.2f} wl={wl:.2f} wr={wr:.2f} obs={len(pts)}"
-            )
-
 
 if __name__ == "__main__":
     main()

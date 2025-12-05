@@ -87,4 +87,4 @@ class TestSender(Robot):
                     self.active_auction = None
 
 if __name__ == "__main__":
-    DummySpotter().run()
+    TestSender().run()
