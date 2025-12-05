@@ -1,20 +1,10 @@
-#launch.json folder
 .vscode/
-#Cache folder
 .alcache/
-#Symbols folder
-.alpackages/
-#Snapshots folder
-.snapshots/
-#Testing Output folder
 .output/
-# OS generated files
-.DS_Store
-# Test result files
 TestResults.xml
-# Python cache files
 *.pyc
 __pycache__/
-controllers/.DS_Store
 worlds/.cafetria.jpg
 .DS_Store
+controllers/.DS_Store
+ontrollers/lib_shared/.DS_Store

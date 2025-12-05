@@ -25,7 +25,7 @@ class Dispatcher(Robot):
     def handle_message(self, msg):
         event = msg.get("event", None)
 
-        if event == "trash_spotted":
+        if event == "trash_found":
             # Spotter sends info about new trash
             print(f"[DISPATCH] Trash spotted → Task {msg['task_id']}")
             self.pending_tasks.append({
