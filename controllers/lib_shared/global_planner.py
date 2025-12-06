@@ -1,18 +1,20 @@
+# ============================================= #
+#  A* PATH PLANNING        -> AUTHOR: ZAHIN     #
+# ============================================= #
+
 import math
 from heapq import heappush, heappop
-from typing import List, Tuple, Optional
-
+from typing import List, Tuple, Optional, Dict
 
 # Simple grid map where 0=free, 1=obstacle. Coordinates: (row, col).
 class OccupancyGrid:
     def __init__(self, width: int, height: int, cell_size: float, origin: Tuple[float, float]):
         self.width, self.height = width, height
         self.cell_size = cell_size
-        self.origin = origin  # (x_origin, y_origin)
+        self.origin = origin
         self.grid = [[0] * width for _ in range(height)]
-        self.max_y = origin[1] + height * cell_size  # y of grid top edge
+        self.max_y = origin[1] + height * cell_size
 
-    # create grid from string representation (MAP_STR)
     @classmethod
     def from_string(cls, map_str: str, cell_size: float, origin: Tuple[float, float]) -> 'OccupancyGrid':
         lines = [l.rstrip('\n') for l in map_str.strip().splitlines() if l.strip()]
@@ -24,38 +26,39 @@ class OccupancyGrid:
                     obj.grid[r][c] = 1
         return obj
 
-
-    # Convert between world coordinates and grid indices
-    # NOTE: back and forth conversions accumulate errors fast due to flooring
     def world_to_grid(self, x: float, y: float) -> Tuple[int, int]:
-        # +X increases row, +Y increases col (90° rotated world)
         row = math.floor((x - self.origin[0]) / self.cell_size)
         col = math.floor((y - self.origin[1]) / self.cell_size)
         return row, col
 
     def grid_to_world(self, r: int, c: int) -> Tuple[float, float]:
-        # Inverse of world_to_grid
         x = r * self.cell_size + self.origin[0] + self.cell_size * 0.5
         y = c * self.cell_size + self.origin[1] + self.cell_size * 0.5
         return round(x, 2), round(y, 2)
 
+    # CRITICAL: Kept for API compatibility with your map_module.py
     def is_valid(self, r: int, c: int) -> bool:
         return 0 <= r < self.height and 0 <= c < self.width
 
     def is_free(self, r: int, c: int) -> bool:
         return self.is_valid(r, c) and self.grid[r][c] == 0
 
-    # this creates a new inflated grid where obstacles are expanded by 'radius' cells
     def inflate(self, radius: int) -> 'OccupancyGrid':
         new_grid = OccupancyGrid(self.width, self.height, self.cell_size, self.origin)
-        new_grid.grid = [row[:] for row in self.grid]  # copy to avoid modifying self
+        # Deep copy the grid to avoid reference issues
+        new_grid.grid = [row[:] for row in self.grid]
+        
         obstacles = [(r, c) for r in range(self.height) for c in range(self.width) if self.grid[r][c] != 0]
         for r, c in obstacles:
-            for dr in range(-radius, radius + 1):
-                for dc in range(-radius, radius + 1):
-                    nr, nc = r + dr, c + dc
-                    if self.is_valid(nr, nc):
-                        new_grid.grid[nr][nc] = 1
+            # Optimized bounds to avoid checking indices that will definitely be invalid
+            r_min = max(0, r - radius)
+            r_max = min(self.height, r + radius + 1)
+            c_min = max(0, c - radius)
+            c_max = min(self.width, c + radius + 1)
+            
+            for nr in range(r_min, r_max):
+                for nc in range(c_min, c_max):
+                    new_grid.grid[nr][nc] = 1
         return new_grid
 
 
@@ -72,55 +75,72 @@ class AStarPlanner:
         if not (grid.is_free(*start) and grid.is_free(*goal)):
             return None
 
-        # Heap items: (f = g+h, g, current, path)
-        queue = [(0.0, 0.0, start, [start])]
-        costs = {start: 0.0}
+        # Optimization: Use Parent Pointers (came_from) instead of storing full path in heap.
+        # Heap items: (f_score, start_node)
+        queue = [(0.0, start)]
+        
+        g_scores = {start: 0.0}
+        came_from: Dict[Tuple[int, int], Tuple[int, int]] = {}
 
         while queue:
-            _, g_curr, curr, path = heappop(queue)
-            if curr == goal:
-                return path
+            _, curr = heappop(queue)
 
-            if g_curr > costs.get(curr, float('inf')):
-                # outdated queue entry
-                continue
+            if curr == goal:
+                return self._reconstruct_path(came_from, curr)
+
+            curr_g = g_scores[curr]
 
             for dr, dc, step_cost in self.moves:
                 nxt = (curr[0] + dr, curr[1] + dc)
+                
                 if not grid.is_free(*nxt):
                     continue
+                
                 # Prevent cutting corners through obstacles
                 if abs(dr) == 1 and abs(dc) == 1:
                     if not (grid.is_free(curr[0] + dr, curr[1]) and grid.is_free(curr[0], curr[1] + dc)):
                         continue
 
-                new_g = g_curr + step_cost
-                if new_g < costs.get(nxt, float('inf')):
-                    costs[nxt] = new_g
+                new_g = curr_g + step_cost
+                
+                # Only explore if we found a cheaper path to 'nxt'
+                if new_g < g_scores.get(nxt, float('inf')):
+                    came_from[nxt] = curr
+                    g_scores[nxt] = new_g
                     h = math.hypot(goal[0] - nxt[0], goal[1] - nxt[1])
-                    heappush(queue, (new_g + h, new_g, nxt, path + [nxt]))
+                    heappush(queue, (new_g + h, nxt))
+        
         return None
 
+    def _reconstruct_path(self, came_from: Dict, current: Tuple[int, int]) -> List[Tuple[int, int]]:
+        path = [current]
+        while current in came_from:
+            current = came_from[current]
+            path.append(current)
+        return path[::-1]
+
     def smooth_path(self, grid: OccupancyGrid, path: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
-        if len(path) <= 2: return path # nothing to smooth
+        if len(path) <= 2: return path 
 
         smoothed = [path[0]]
         i, n = 0, len(path)
         while i < n - 1:
-            # try to connect as far ahead as possible
             j = n - 1
-            while j > i and not self._line_of_sight(grid, path[i], path[j]):
+            # Greedy check from the end backwards
+            while j > i:
+                if self._line_of_sight(grid, path[i], path[j]):
+                    break
                 j -= 1
-            if j == i:
-                i += 1
-                smoothed.append(path[i])
-            else:
-                smoothed.append(path[j])
-                i = j
+            
+            if j == i: # Should not happen if path is valid, but safety valve
+                j = i + 1
+            
+            smoothed.append(path[j])
+            i = j
         return smoothed
 
-    # Bresenham's line algorithm to check line of sight between two grid cells
     def _line_of_sight(self, grid: OccupancyGrid, p1: Tuple[int, int], p2: Tuple[int, int]) -> bool:
+        """Bresenham's Line Algorithm."""
         r0, c0 = p1
         r1, c1 = p2
         dr = abs(r1 - r0)
