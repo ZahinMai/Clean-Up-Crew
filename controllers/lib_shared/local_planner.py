@@ -1,3 +1,6 @@
+# ============================================= #
+#  DWA OBSTACLE AVOIDANCE  -> AUTHOR: AJINKYA   #
+# ============================================= #
 from __future__ import annotations
 import math
 from typing import Dict, List, Tuple
@@ -22,7 +25,6 @@ DEFAULTS: Dict[str, float] = {
     "EPS": 0.05,
     "D_NORM": 2.0,
 }
-
 
 def _clip(x: float, lo: float, hi: float) -> float:
     if x < lo:

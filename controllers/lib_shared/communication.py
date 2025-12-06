@@ -1,3 +1,6 @@
+# ============================================= #
+#  COMM MODULE              -> AUTHOR: KUNAL    #
+# ============================================= #
 import json
 class Communication:
     def __init__(self, robot, channel=1):

@@ -1,3 +1,6 @@
+# ================================================ #
+#  CONTROLLER FOR ALL COLLECTORS  -> AUTHOR: ZAHIN #
+# ================================================ #
 from controller import Robot
 import math, os, sys
 from collections import deque
