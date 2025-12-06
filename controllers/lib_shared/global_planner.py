@@ -28,13 +28,15 @@ class OccupancyGrid:
     # Convert between world coordinates and grid indices
     # NOTE: back and forth conversions accumulate errors fast due to flooring
     def world_to_grid(self, x: float, y: float) -> Tuple[int, int]:
-        col = math.floor((x - self.origin[0]) / self.cell_size)
-        row = math.floor((self.max_y - y) / self.cell_size)
+        # +X increases row, +Y increases col (90° rotated world)
+        row = math.floor((x - self.origin[0]) / self.cell_size)
+        col = math.floor((y - self.origin[1]) / self.cell_size)
         return row, col
-    
+
     def grid_to_world(self, r: int, c: int) -> Tuple[float, float]:
-        x = c * self.cell_size + self.origin[0] + self.cell_size * 0.5
-        y = self.max_y - (r * self.cell_size) - self.cell_size * 0.5
+        # Inverse of world_to_grid
+        x = r * self.cell_size + self.origin[0] + self.cell_size * 0.5
+        y = c * self.cell_size + self.origin[1] + self.cell_size * 0.5
         return round(x, 2), round(y, 2)
 
     def is_valid(self, r: int, c: int) -> bool:

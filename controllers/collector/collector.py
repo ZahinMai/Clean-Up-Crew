@@ -49,14 +49,16 @@ def get_lidar_points(lidar, max_r=3.5, min_r=0.1):
         points.append((r*math.cos(a), r*math.sin(a)))
     return points
 
+
 class Collector(Robot):
     def __init__(self):
         super().__init__()
         self.timestep = int(self.getBasicTimeStep())
-        self.robot_id =  self.getName() 
+        self.robot_id = self.getName()
         self.state = "IDLE"
         
-        self.comm = Communication(self, channel=1) # init comm
+        # Initialise communication on channel 1
+        self.comm = Communication(self, channel=1)
 
         # ------ Sensor & Actuator Setup ------ #
         self.gps = self.getDevice('gps')
@@ -83,7 +85,7 @@ class Collector(Robot):
         
         # ---------- Planning Setup ----------- #
         self.grid = get_map(verbose=False)
-        self.plan_grid = self.grid.inflate(0) 
+        self.plan_grid = self.grid.inflate(0)
         self.astar = AStarPlanner()
         self.dwa = DWA(params=DWA_CONFIG)
         # ------------------------------------- #
@@ -92,13 +94,17 @@ class Collector(Robot):
         self.path_world = [] 
         self.path_idx = 0
         self.current_goal = None
+        self.current_task_id = None
         self.last_replan = 0.0
         self.last_vis = 0.0
+        self.last_idle_broadcast = 0.0
         self.prev_cmd = (0.0, 0.0)
         self.rx = 0.0
         self.rz = 0.0
         self.yaw = 0.0
         # ------------------------------------- #
+        
+        print(f"[{self.robot_id}] Initialized in IDLE state")
 
     def update_pose(self):
         """Reads sensors to update robot's internal knowledge of position."""
@@ -107,45 +113,52 @@ class Collector(Robot):
             self.rx, self.rz = vals[0], vals[1]
         
         if self.imu.getSamplingPeriod() > 0:
-            self.yaw = self.imu.getRollPitchYaw()[2]
+            self.yaw = self.imu.getRollPitchYaw()[2] - math.pi/2
         elif self.compass.getSamplingPeriod() > 0:
             v = self.compass.getValues()
             self.yaw = math.atan2(v[0], v[2])
 
     def send_idle_status(self):
-        """Broadcasts availability."""
-        self.comm.send({
+        """Broadcasts availability to spotter."""
+        success = self.comm.send({
             "event": "idle",
             "collector_id": self.robot_id,
             "pos": [self.rx, self.rz]
         })
+        if success:
+            print(f"[{self.robot_id}] Broadcast IDLE status at ({self.rx:.2f}, {self.rz:.2f})")
+        return success
 
     def stop_motors(self):
+        """Stop both motors."""
         self.lm.setVelocity(0)
         self.rm.setVelocity(0)
 
     def plan_path_to_goal(self, gx, gz):
         """Uses A* to find a path from current rx,rz to gx,gz."""
-        print(f"[A*] Planning from ({self.rx:.2f}, {self.rz:.2f}) to ({gx:.2f}, {gz:.2f})")
+        print(f"[{self.robot_id}] Planning path from ({self.rx:.2f}, {self.rz:.2f}) to ({gx:.2f}, {gz:.2f})")
         
         def valid_node(node):
-            if self.plan_grid.is_free(*node): return node
+            if self.plan_grid.is_free(*node): 
+                return node
             # BFS to find nearest free node
             q, seen = deque([node]), {node}
             while q:
                 curr = q.popleft()
-                if self.plan_grid.is_free(*curr): return curr
+                if self.plan_grid.is_free(*curr): 
+                    return curr
                 for dr, dc in [(0,1),(0,-1),(1,0),(-1,0)]:
                     nr, nc = curr[0]+dr, curr[1]+dc
                     if (nr, nc) not in seen and 0<=nr<self.plan_grid.height and 0<=nc<self.plan_grid.width:
-                        seen.add((nr,nc)); q.append((nr,nc))
+                        seen.add((nr,nc))
+                        q.append((nr,nc))
             return None
 
         start_node = valid_node(self.plan_grid.world_to_grid(self.rx, self.rz))
         goal_node = valid_node(self.plan_grid.world_to_grid(gx, gz))
         
         if not start_node or not goal_node:
-            print("Plan failed: Start or Goal invalid (off-grid or obstacle)")
+            print(f"[{self.robot_id}] ERROR: Planning failed - invalid start/goal")
             return False
 
         nodes = self.astar.plan(self.plan_grid, start_node, goal_node)
@@ -153,12 +166,14 @@ class Collector(Robot):
             self.path_world = [self.grid.grid_to_world(r,c) for r,c in nodes]
             self.path_idx = 0
             self.current_goal = (gx, gz)
-            print(f"Path planned to {gx}, {gz} with {len(nodes)} steps.")
+            print(f"[{self.robot_id}] ✓ Path found with {len(nodes)} waypoints")
             return True
+        
+        print(f"[{self.robot_id}] ERROR: No path found")
         return False
 
     def update_navigation(self):
-        """ Executes path following. Returns True if still moving, False if arrived."""
+        """Executes path following. Returns True if still moving, False if arrived."""
         now = self.getTime()
 
         # ----------- Visualisation ----------- #
@@ -168,7 +183,8 @@ class Collector(Robot):
             self.last_vis = now
         # ------------------------------------- #
 
-        if not self.path_world: return False # No path -> "arrived" or "idle"
+        if not self.path_world:
+            return False  # No path -> arrived
 
         # Path Following Logic (Pure Pursuit / Lookahead)
         target = None
@@ -178,14 +194,14 @@ class Collector(Robot):
             if math.hypot(wx - self.rx, wz - self.rz) < 0.25:
                 self.path_idx += 1
             else:
-                # Target the next waypoint, but don't go past the final one
+                # Target the next waypoint
                 target = self.path_world[min(self.path_idx + 1, len(self.path_world)-1)]
                 break
         
         # No target left -> end reached
         if not target:
             self.stop_motors()
-            return False 
+            return False
 
         # ------ Calculate Velocities ------
         tx, tz = target
@@ -197,7 +213,12 @@ class Collector(Robot):
 
         # Account for dynamic obstacles w DWA
         if DWA_ENABLED:
-            v, w = self.dwa.get_safe_velocities(get_lidar_points(self.lidar), (gx_r, gy_r), self.prev_cmd, self.prev_cmd)
+            v, w = self.dwa.get_safe_velocities(
+                get_lidar_points(self.lidar), 
+                (gx_r, gy_r), 
+                self.prev_cmd, 
+                self.prev_cmd
+            )
         
         # Simple Proportional Controller
         else:
@@ -206,7 +227,7 @@ class Collector(Robot):
             ang = _wrap(math.atan2(gy_r, gx_r))
             
             v = 0.5 * dist
-            w = -1.5 * ang # Increased angular gain for snappier turns
+            w = -1.5 * ang
     
             # Clamp limits
             v = max(-0.35, min(0.35, v))
@@ -222,69 +243,149 @@ class Collector(Robot):
         self.lm.setVelocity(max(-limit, min(limit, wl)))
         self.rm.setVelocity(max(-limit, min(limit, wr)))
         
-        return True # Still moving
+        return True  # Still moving
+
+    def handle_auction_start(self, msg):
+        """Handle incoming auction announcement."""
+        if self.state != "IDLE":
+            return  # Only bid if idle
+        
+        task_id = msg.get("task_id")
+        pos = msg.get("pos")
+        
+        if not task_id or not pos:
+            print(f"[{self.robot_id}] ERROR: Invalid auction message")
+            return
+        
+        tx, tz = pos[0], pos[1]
+        
+        # Calculate BID (Cost = Euclidean Distance)
+        cost = math.hypot(tx - self.rx, tz - self.rz)
+        
+        self.comm.send({
+            "event": "bid",
+            "collector_id": self.robot_id,
+            "task_id": task_id,
+            "cost": cost
+        })
+        
+        print(f"[{self.robot_id}] Distance {cost:.2f} to trash for task_{task_id}")
+
+    def handle_task_assignment(self, msg):
+        """Handle winning a task auction."""
+        if msg.get("collector_id") != self.robot_id:
+            return  # Not for us
+        
+        task_id = msg.get("task_id")
+        target_x = msg.get("target_x")
+        target_z = msg.get("target_z")
+        
+        if None in [task_id, target_x, target_z]:
+            print(f"[{self.robot_id}] ERROR: Invalid task assignment")
+            return
+        
+        print(f"[{self.robot_id}] assigned {task_id}!")
+        print(f"[{self.robot_id}]    Target: ({target_x:.2f}, {target_z:.2f})")
+        
+        self.current_task_id = task_id
+        
+        # Plan path to target
+        success = self.plan_path_to_goal(target_x, target_z)
+        if success:
+            self.state = "NAVIGATING"
+            print(f"[{self.robot_id}] → Transitioning to NAVIGATING")
+        else:
+            print(f"[{self.robot_id}] Planning failed, remaining IDLE")
+            self.current_task_id = None
+   
+    def debug_position(self):
+        """Print real GPS position vs mapped grid position."""
+        # Real position from GPS
+        if self.gps.getSamplingPeriod() > 0:
+            vals = self.gps.getValues()
+            real_x, real_y, real_z = vals[0], vals[1], vals[2]
+            
+            # Current mapped position (what code uses)
+            mapped_x, mapped_z = self.rx, self.rz
+            
+            # Convert to grid coordinates
+            grid_pos = self.grid.world_to_grid(mapped_x, mapped_z)
+            
+            print(f"\n{'='*60}")
+            print(f"[{self.robot_id}] POSITION DEBUG")
+            print(f"{'='*60}")
+            print(f"Real GPS:    X={real_x:.3f}, Y={real_y:.3f}, Z={real_z:.3f}")
+            print(f"Mapped:      rx={mapped_x:.3f}, rz={mapped_z:.3f}")
+            print(f"Grid:        row={grid_pos[0]}, col={grid_pos[1]}")
+            print(f"Grid origin: {self.grid.origin}")
+            print(f"Cell size:   {self.grid.cell_size:.3f}")
+            print(f"{'='*60}\n")
+            visualise_robot_on_map(self.grid, self.rx, self.rz, self.yaw)
+
+    def handle_messages(self):
+        """Process all incoming messages."""
+        # Check for messages (non-blocking)
+        msg = self.comm.receive()
+        
+        if not msg:
+            return
+        
+        event = msg.get("event")
+        
+        if event == "auction_start":
+            self.handle_auction_start(msg)
+        
+        elif event == "assign_task":
+            self.handle_task_assignment(msg)
+        
+        else:
+            # Unknown event type
+            pass
 
     def run(self):
-        print(f"Collector {self.robot_id} Started (Auction Mode).")
+        print(f"\n{'='*60}")
+        print(f"Collector {self.robot_id} Started")
+        print(f"Mode: Auction-Based Task Assignment")
+        print(f"{'='*60}\n")
         
         while self.step(self.timestep) != -1:
-            self.update_pose() # Always update sensors
-
-            # --- Check Communication --- #
-            msg = self.comm.receive()
-            if msg:
-                # 1. Handle Auction
-                if msg.get("event") == "auction_start":
-                    if self.state == "IDLE": # Only bid if free
-                        task_id = msg.get("task_id")
-                        tx, tz = msg.get("pos")
-                        
-                        # Calculate BID (Cost = Distance)
-                        cost = math.hypot(tx - self.rx, tz - self.rz)
-                        
-                        self.comm.send({
-                            "event": "bid",
-                            "collector_id": self.robot_id,
-                            "task_id": task_id,
-                            "cost": cost
-                        })
-                        print(f"-> Bidding {cost:.2f} on Task {task_id}")
-
-                # 2. Handle Awarded Task
-                elif msg.get("event") == "assign_task" and msg.get("collector_id") == self.robot_id:
-                    print(f"*** WON TASK {msg.get('task_id')}! ***")
-                    
-                    target_x = msg.get("target_x") 
-                    target_z = msg.get("target_z")
-                    self.current_task_id = msg.get("task_id")
-                    
-                    # Use original A* planner
-                    success = self.plan_path_to_goal(target_x, target_z)
-                    if success: 
-                        self.state = "NAVIGATING"
-                    else: 
-                        print("Planning failed. Remaining IDLE.")
-
-
+            # Always update pose
+            self.update_pose()
+            
+            # Process incoming messages
+            self.handle_messages()
+            
+            # if self.getTime() % 2.0 < 0.1: self.debug_position() # POS DEBUG (FOR MAP CALLIBRATION)
+               
             # --- Finite State Machine ---
             if self.state == "IDLE":
                 self.stop_motors()
-                if self.getTime() % 1.0 < 0.1: 
+                
+                # Periodically broadcast idle status (every 2 seconds)
+                now = self.getTime()
+                if now - self.last_idle_broadcast >= 2.0:
                     self.send_idle_status()
+                    self.last_idle_broadcast = now
 
             elif self.state == "NAVIGATING":
                 is_moving = self.update_navigation()
                 
                 if not is_moving:
-                    print("Task Complete (Target Reached).")
+                    print(f"[{self.robot_id}] Task {self.current_task_id} COMPLETE")
                     
-                    # Notify Supervisor/Spotter
+                    # Notify spotter of completion
                     self.comm.send({
                         "event": "collected",
-                        "collector_id": self.robot_id
+                        "collector_id": self.robot_id,
+                        "task_id": self.current_task_id
                     })
                     
+                    # Return to idle
+                    self.current_task_id = None
+                    self.path_world = []
                     self.state = "IDLE"
+                    print(f"[{self.robot_id}] → Transitioning to IDLE")
+
 
 if __name__ == "__main__":
     Collector().run()
