@@ -8,7 +8,6 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/apartment_structure/protos/Wall.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/MattePaint.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/tables/protos/Table.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/VarnishedPine.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/chairs/protos/Chair.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/robotis/turtlebot/protos/TurtleBot3Burger.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/devices/robotis/protos/RobotisLds01.proto"
@@ -23,14 +22,9 @@ WorldInfo {
   title "cafeteria"
 }
 Viewpoint {
-  orientation 0.46536164164053956 -0.5828196045184247 -0.6661530237705215 4.532192929395498
-  position 1.3414262669998862 -10.409105012622565 35.72022024227763
+  orientation 0.604272423379594 -0.6174510504610188 -0.5035961066445386 4.092073430907186
+  position 0.007628102562853956 3.6462793930711213 32.170818360315494
 }
-
-# ============================================================================
-# ENVIRONMENT - Background, Lighting, Floor
-# ============================================================================
-
 TexturedBackground {
   texture "entrance_hall"
   luminosity 0.5
@@ -40,7 +34,7 @@ TexturedBackgroundLight {
   texture "entrance_hall"
 }
 Floor {
-  size 8 13
+  size 8 12
   appearance Parquetry {
     type "light strip"
     textureTransform TextureTransform {
@@ -49,42 +43,32 @@ Floor {
     }
   }
 }
-
-# ============================================================================
-# WALLS - Perimeter and Counter
-# ============================================================================
-
 Wall {
   translation -4 0 0
   name "wall_west"
-  size 0.06 13 2.5
+  size 0.06 12 2.5
   appearance NULL
 }
 Wall {
   translation 4 0 0
   name "wall_east"
-  size 0.06 13 2.5
+  size 0.06 12 2.5
   appearance NULL
 }
 Wall {
-  translation 0 -6.5 0
+  translation 0 -6 0
   rotation 0 0 1 1.5708
   name "wall_south"
   size 0.06 8 2.5
   appearance NULL
 }
 Wall {
-  translation 0 6.5 0
+  translation 0 6 0
   rotation 0 0 1 1.5708
   name "wall_north"
   size 0.06 8 2.5
   appearance NULL
 }
-
-# ============================================================================
-# CEILING LIGHTS
-# ============================================================================
-
 CeilingLight {
   translation -2 -4 2.5
   bulbColor 0.91 0.72 0.43
@@ -112,7 +96,7 @@ CeilingLight {
   pointLightCastShadows TRUE
 }
 CeilingLight {
-  translation 2 -4 2.5
+  translation 2 -3.45 2.5
   name "ceiling_light_3"
   bulbColor 0.91 0.72 0.43
   supportColor 0.53 0.54 0.52
@@ -138,14 +122,8 @@ CeilingLight {
   pointLightIntensity 3
   pointLightCastShadows TRUE
 }
-
-# ============================================================================
-# DINING AREA - Tables and Chairs (Grouped by Table)
-# ============================================================================
-
-# Table 0 - Left Column, Back Row (at -2.5, -4)
 Table {
-  translation -2.5 -4 0
+  translation -2.5 -3.5 0
   size 1 1.6 0.74
   feetSize 0.05 0.05
   legAppearance MattePaint {
@@ -153,27 +131,25 @@ Table {
   }
 }
 Chair {
-  translation -2.5 -4.8 0
+  translation -2.5 -4.2 0
   rotation 0 0 1 1.5708
 }
 Chair {
-  translation -2.5 -3.2 0
+  translation -2.5 -2.8 0
   rotation 0 0 1 -1.5708
   name "chair_1"
 }
 Chair {
-  translation -3 -4 0
+  translation -3 -3.5 0
   name "chair_2"
 }
 Chair {
-  translation -2 -4 0
+  translation -2 -3.5 0
   rotation 0 0 1 3.14159
   name "chair_3"
 }
-
-# Table 1 - Center Column, Back Row (at 0, -4)
 Table {
-  translation 0 -4 0
+  translation 0 -3.5 0
   name "table_1"
   size 1 1.6 0.74
   feetSize 0.05 0.05
@@ -181,14 +157,27 @@ Table {
     baseColor 0.2 0.2 0.2
   }
 }
-Chair { translation 0 -4.8 0 rotation 0 0 1 1.5708 name "chair_4" }
-Chair { translation 0 -3.2 0 rotation 0 0 1 -1.5708 name "chair_5"}
-Chair {translation -0.5 -4 0 name "chair_6"}
-Chair { translation 0.5 -4 0 rotation 0 0 1 3.14159 name "chair_7"}
-
-# Table 2 - Right Column, Back Row (at 2.5, -4)
+Chair {
+  translation 0 -4.2 0
+  rotation 0 0 1 1.5708
+  name "chair_4"
+}
+Chair {
+  translation 0 -2.8 0
+  rotation 0 0 1 -1.5708
+  name "chair_5"
+}
+Chair {
+  translation -0.5 -3.5 0
+  name "chair_6"
+}
+Chair {
+  translation 0.5 -3.5 0
+  rotation 0 0 1 3.14159
+  name "chair_7"
+}
 Table {
-  translation 2.5 -4 0
+  translation 2.5 -3.5 0
   name "table_2"
   size 1 1.6 0.74
   feetSize 0.05 0.05
@@ -196,26 +185,27 @@ Table {
     baseColor 0.2 0.2 0.2
   }
 }
-Chair { translation 2.5 -4.8 0 rotation 0 0 1 1.5708 name "chair_8" }
-
 Chair {
-  translation 2.5 -3.2 0
+  translation 2.5 -4.2 0
+  rotation 0 0 1 1.5708
+  name "chair_8"
+}
+Chair {
+  translation 2.5 -2.8 0
   rotation 0 0 1 -1.5708
   name "chair_9"
 }
 Chair {
-  translation 2 -4 0
+  translation 2 -3.5 0
   name "chair_10"
 }
 Chair {
-  translation 3 -4 0
+  translation 3 -3.5 0
   rotation 0 0 1 3.14159
   name "chair_11"
 }
-
-# Table 3 - Left Column, Middle Row (at -2.5, -1.5)
 Table {
-  translation -2.5 -1.5 0
+  translation -2.5 0 0
   name "table_3"
   size 1 1.6 0.74
   feetSize 0.05 0.05
@@ -224,28 +214,25 @@ Table {
   }
 }
 Chair {
-  translation -2.5 -2.3 0
+  translation -2.5 -0.7 0
   rotation 0 0 1 1.5708
   name "chair_12"
 }
 Chair {
-  translation -2.5 -0.7 0
+  translation -2.5 0.7 0
   rotation 0 0 1 -1.5708
   name "chair_13"
 }
 Chair {
-  translation -3 -1.5 0
+  translation -2.9 0 0
   name "chair_14"
 }
 Chair {
-  translation -2 -1.5 0
+  translation -2.1 0 0
   rotation 0 0 1 3.14159
   name "chair_15"
 }
-
-# Table 4 - Center Column, Middle Row (at 0, -1.5)
 Table {
-  translation 0 -1.5 0
   name "table_4"
   size 1 1.6 0.74
   feetSize 0.05 0.05
@@ -254,28 +241,26 @@ Table {
   }
 }
 Chair {
-  translation 0 -2.3 0
+  translation 0 -0.7 0
   rotation 0 0 1 1.5708
   name "chair_16"
 }
 Chair {
-  translation 0 -0.7 0
+  translation 0 0.7 0
   rotation 0 0 1 -1.5708
   name "chair_17"
 }
 Chair {
-  translation -0.5 -1.5 0
+  translation -0.4 0 0
   name "chair_18"
 }
 Chair {
-  translation 0.5 -1.5 0
+  translation 0.4 0 0
   rotation 0 0 1 3.14159
   name "chair_19"
 }
-
-# Table 5 - Right Column, Middle Row (at 2.5, -1.5)
 Table {
-  translation 2.5 -1.5 0
+  translation 2.5 0 0
   name "table_5"
   size 1 1.6 0.74
   feetSize 0.05 0.05
@@ -284,28 +269,26 @@ Table {
   }
 }
 Chair {
-  translation 2.5 -2.3 0
+  translation 2.5 -0.7 0
   rotation 0 0 1 1.5708
   name "chair_20"
 }
 Chair {
-  translation 2.5 -0.7 0
+  translation 2.5 0.7 0
   rotation 0 0 1 -1.5708
   name "chair_21"
 }
 Chair {
-  translation 2 -1.5 0
+  translation 2 0 0
   name "chair_22"
 }
 Chair {
-  translation 3 -1.5 0
+  translation 2.9 0 0
   rotation 0 0 1 3.14159
   name "chair_23"
 }
-
-# Table 6 - Left Column, Front Row (at -2.5, 1)
 Table {
-  translation -2.5 1 0
+  translation -2.5 3.5 0
   name "table_6"
   size 1 1.6 0.74
   feetSize 0.05 0.05
@@ -314,28 +297,26 @@ Table {
   }
 }
 Chair {
-  translation -2.5 0.2 0
+  translation -2.5 2.8 0
   rotation 0 0 1 1.5708
   name "chair_24"
 }
 Chair {
-  translation -2.5 1.8 0
+  translation -2.5 4.2 0
   rotation 0 0 1 -1.5708
   name "chair_25"
 }
 Chair {
-  translation -3 1 0
+  translation -3 3.5 0
   name "chair_26"
 }
 Chair {
-  translation -2 1 0
+  translation -2 3.5 0
   rotation 0 0 1 3.14159
   name "chair_27"
 }
-
-# Table 7 - Center Column, Front Row (at 0, 1)
 Table {
-  translation 0 1 0
+  translation 0 3.5 0
   name "table_7"
   size 1 1.6 0.74
   feetSize 0.05 0.05
@@ -344,28 +325,26 @@ Table {
   }
 }
 Chair {
-  translation 0 0.2 0
+  translation 0 2.8 0
   rotation 0 0 1 1.5708
   name "chair_28"
 }
 Chair {
-  translation 0 1.8 0
+  translation 0 4.2 0
   rotation 0 0 1 -1.5708
   name "chair_29"
 }
 Chair {
-  translation -0.5 1 0
+  translation -0.5 3.5 0
   name "chair_30"
 }
 Chair {
-  translation 0.5 1 0
+  translation 0.5 3.5 0
   rotation 0 0 1 3.14159
   name "chair_31"
 }
-
-# Table 8 - Right Column, Front Row (at 2.5, 1)
 Table {
-  translation 2.5 1 0
+  translation 2.5 3.5 0
   name "table_8"
   size 1 1.6 0.74
   feetSize 0.05 0.05
@@ -374,40 +353,41 @@ Table {
   }
 }
 Chair {
-  translation 2.5 0.2 0
+  translation 2.5 2.8 0
   rotation 0 0 1 1.5708
   name "chair_32"
 }
 Chair {
-  translation 2.5 1.8 0
+  translation 2.5 4.2 0
   rotation 0 0 1 -1.5708
   name "chair_33"
 }
 Chair {
-  translation 2 1 0
+  translation 2 3.5 0
   name "chair_34"
 }
 Chair {
-  translation 3 1 0
+  translation 3 3.5 0
   rotation 0 0 1 3.14159
   name "chair_35"
 }
-
-# ============================================================================
-# ROBOTS - Collectors and Agents
-# ============================================================================
-
 DEF collector_1 TurtleBot3Burger {
-  hidden position_0_0 -1.599780726642333e-11
-  hidden position_0_1 1.2301781105180268e-11
-  hidden position_0_2 1.0372630319958328e-06
-  hidden position2_0_2 0.0002183094467052993
-  hidden position3_0_2 -3.2745598527583087e-07
-  hidden linearVelocity_0 -5.956888110207903e-17 -1.4997415353134913e-15 -5.938609979156616e-17
-  hidden angularVelocity_0 2.7641338094438885e-15 -1.5623729542686597e-15 6.30808352106158e-17
-  hidden rotation_14 0.00475112014871196 0.9999875892135967 -0.0014994252604292998 0.00021831215635787299
-  translation 0.5000000004954359 2.4999999994794075 -0.00024773920598919474
-  rotation -0.0021116496069960486 -0.9999977704541836 4.753900379751254e-06 0.004641946780161626
+  hidden position_0_0 -1.599498879402248e-11
+  hidden position_0_1 3.133853133896385e-11
+  hidden position_0_2 1.037200797687004e-06
+  hidden position2_0_2 0.0002183094147372864
+  hidden position3_0_2 -3.274559852982289e-07
+  hidden linearVelocity_0 7.013006017870491e-17 5.1059626184337216e-15 -5.938609979156615e-17
+  hidden angularVelocity_0 -3.9398512949749695e-15 1.757364855018706e-15 1.3824638263720425e-16
+  hidden linearVelocity_12 5.1046618217867575e-17 6.017326842223055e-15 1.94306812147234e-22
+  hidden angularVelocity_12 -2.6036130428387126e-14 1.4750667592695064e-15 1.243847852964473e-16
+  hidden linearVelocity_13 4.5690255611002273e-17 -4.254825488581352e-15 2.493207267205616e-16
+  hidden angularVelocity_13 -2.603612689170123e-14 1.3204490491408375e-15 1.0838719859877752e-16
+  hidden rotation_14 0.004750835780553957 0.999987590564261 -0.0014994255133173972 0.00021831212381077152
+  hidden linearVelocity_14 -6.816633478403399e-16 4.950771145343542e-15 -2.5365751854119846e-15
+  hidden angularVelocity_14 -1.2376927448604033e-12 -1.7028200055357836e-13 6.01178767006141e-26
+  translation 0.5000000004954351 2.4999999994786233 -0.00024773920598926413
+  rotation -0.0021116496071548222 -0.9999977704541833 4.75390038500022e-06 0.004641946780163022
   name "collector_1"
   controller "collector"
   extensionSlot [
@@ -426,16 +406,23 @@ DEF collector_1 TurtleBot3Burger {
   ]
 }
 DEF collector_2 TurtleBot3Burger {
-  hidden position_0_0 -1.5999627761810158e-11
-  hidden position_0_1 1.229830675159864e-11
-  hidden position_0_2 1.0372210586904027e-06
-  hidden position2_0_2 0.0002183094587905657
-  hidden position3_0_2 -3.2745578396878954e-07
-  hidden linearVelocity_0 -7.783414788034175e-18 4.253660610674605e-15 0
-  hidden angularVelocity_0 -1.1828543839789634e-15 -2.9504808686388538e-16 4.598376766127366e-17
-  hidden rotation_14 0.004750927627357909 0.999987590129755 -0.0014994242776485776 0.00021831216856303478
-  translation 1.500000000495436 1.9999999994794069 -0.00024773920598925026
-  rotation -0.002111649607091905 -0.9999977704541833 4.753898967992099e-06 0.004641946780163167
+  hidden position_0_0 -4.461318373086939e-11
+  hidden position_0_1 1.2298908717036719e-11
+  hidden position_0_2 1.037130904195803e-06
+  hidden position2_0_2 0.00021830938709993278
+  hidden position3_0_2 -3.2745578815187583e-07
+  hidden linearVelocity_0 -5.339110043844946e-17 5.238769417003385e-15 1.1877219958313228e-16
+  hidden angularVelocity_0 2.767428904031694e-15 -1.170560754139757e-15 1.295611478059543e-16
+  hidden rotation_12 0 -1 0 1.5707960001052277
+  hidden linearVelocity_12 -3.877645842875706e-17 2.1663769247387183e-15 2.4932540081778497e-16
+  hidden angularVelocity_12 -3.301349890508971e-22 -1.2355783963192546e-15 4.6607246206655825e-17
+  hidden linearVelocity_13 -3.71705481571898e-17 -1.3268328311100405e-15 4.98643857375615e-16
+  hidden angularVelocity_13 -1.9527101605791007e-14 -1.1722433257403315e-15 7.433972982790668e-17
+  hidden rotation_14 0.004750516235332428 0.9999875920833493 -0.0014994248373820464 0.000218312097366248
+  hidden linearVelocity_14 -1.368428702554271e-15 5.3446372642069034e-15 -1.0855506456752922e-13
+  hidden angularVelocity_14 -1.3361592712765992e-12 -3.421071641744465e-13 1.2041305621310787e-30
+  translation 1.5000000004954348 1.999999999478625 -0.00024773920598917393
+  rotation -0.0021116496070777546 -0.9999977704541834 4.753899869167118e-06 0.004641946780164853
   name "collector_2"
   controller "collector"
   extensionSlot [
@@ -454,18 +441,24 @@ DEF collector_2 TurtleBot3Burger {
   ]
 }
 TurtleBot3Burger {
-  hidden position_0_0 38.67772351616627
-  hidden position_0_1 132.3367053355061
-  hidden position_0_2 -222.87633055487214
-  hidden position2_0_2 0.44698680448853967
-  hidden position3_0_2 302.52191920765665
-  hidden linearVelocity_0 0.1423081031010142 0.04262523328535248 -4.23149881777473e-06
-  hidden angularVelocity_0 -3.456832181709561e-05 -0.00034073495943296974 -1.0739959908369296
-  hidden rotation_9 0 -1 0 0.5921843269112511
-  hidden rotation_10 0.8306657078403644 -4.5064256037009944e-07 0.5567714807871029 3.141597219067106
-  hidden rotation_11 0.8732466545340658 -0.45979374109049664 0.16133814179873163 3.4951263693139545
-  translation 3.683570625039845 -0.11974911957083742 -0.0002455419106496756
-  rotation 0.0013089181926893123 0.17572646855144125 -0.9844381620922689 -0.026606570782854888
+  hidden position_0_0 -84.05336075317877
+  hidden position_0_1 -270.19912699648364
+  hidden position_0_2 -131.15927566829995
+  hidden position2_0_2 0.019548626192013363
+  hidden position3_0_2 -593.6143307890363
+  hidden linearVelocity_0 0.0008626318009983329 1.4083595106360487e-05 8.035592288785489e-07
+  hidden angularVelocity_0 2.8965544376950752e-05 4.4647730997043815e-06 -0.00044576272272195275
+  hidden rotation_9 0 1 0 2.3404375473354455
+  hidden linearVelocity_9 0.0008765680048944764 -2.1044697083712256e-05 1.4015638259516098e-06
+  hidden angularVelocity_9 2.545348491310196 0.02611609826854452 2.8626048703077073e-05
+  hidden rotation_10 0.6992272055998566 2.5778949456658215e-08 0.7148995138822066 3.1415973068939693
+  hidden linearVelocity_10 0.0008780551108464483 5.027589011984519e-05 2.055319440878155e-06
+  hidden angularVelocity_10 6.669677051237978 0.0684049454623389 0.0007735916607025168
+  hidden rotation_11 -0.019161875708455702 -0.38430012224419285 0.923009338285606 3.28452010088859
+  hidden linearVelocity_11 0.0008410413922411493 1.507449427551573e-05 -5.836193680501758e-07
+  hidden angularVelocity_11 -0.003768623565926414 0.2102603480919461 2.178940827931541e-13
+  translation 0.454705211922429 -0.6511378154494629 -0.00037279262370138594
+  rotation 0.0016761279702228605 -0.0014764326198527453 -0.9999975053677617 -1.5810452338452539
   name "HumanAgent"
   controller "human_agent"
   extensionSlot [
@@ -476,13 +469,13 @@ TurtleBot3Burger {
   ]
 }
 E-puck {
-  hidden position_0_0 3.100079856774561e-08
-  hidden position_0_1 3.100078959747058e-08
+  hidden position_0_0 3.105204467601719e-08
+  hidden position_0_1 9.29629274482819e-08
   hidden rotation_1 0 1 0 2.9802322387695313e-08
-  hidden rotation_2 0 1 0 2.9802322387695313e-08
-  translation -3.0051791155733047 -4.999999999936547 -6.396223925257336e-05
-  rotation 1.8581444863915352e-05 -0.9999999995901788 2.1780087806473804e-05 0.00013149656357798524
-  controller "test_sender"
+  hidden rotation_2 0 1 0 9.424321830774485e-08
+  translation -3.0051791154810066 -4.99999999993655 -6.396198601092001e-05
+  rotation 0.5909466440674881 0.1953629705067833 0.782697498156305 8.27022114804962e-09
+  controller "test_spotter"
   window "<none>"
   turretSlot [
     Compass {
