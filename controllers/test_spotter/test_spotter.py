@@ -46,7 +46,7 @@ class SpotterTester(Robot):
 
     def print_header(self):
         print("\n" + "="*70)
-        print("SPOTTER AUCTION TEST - Manual")
+        print("SPOTTER AUCTION TEST")
         print("="*70)
         if self.manual:
             print("Controls: [A] Auction [S] Status [R] Reset [Q] Quit")
@@ -85,7 +85,7 @@ class SpotterTester(Robot):
             if task_id not in self.bids_received:
                 self.bids_received[task_id] = []
             self.bids_received[task_id].append((spotter_id, cost))
-            print(f"  📊 BID {spotter_id}: ${cost:.2f} for task {task_id}")
+            print(f"   -> BID {spotter_id}: ${cost:.2f} for task {task_id}")
 
     def process_complete(self, msg):
         spotter_id = msg.get("collector_id")
@@ -103,7 +103,7 @@ class SpotterTester(Robot):
         task_id = self.current_task_id
         
         print(f"\n{'─'*70}")
-        print(f"🔔 AUCTION #{task_id}: {name} at ({x:.2f}, {z:.2f})")
+        print(f"**AUCTION**: #{task_id}: {name} at ({x:.2f}, {z:.2f})")
         print(f"{'─'*70}")
         
         self.send_message({
@@ -181,7 +181,7 @@ class SpotterTester(Robot):
             if len(self.spotters_idle) < 1:
                 return
             self.print_status()
-            print("▶️  Starting automated tests\n")
+            print("▶ Starting automated tests\n")
             self.test_phase = 1
             self.start_time = now
         

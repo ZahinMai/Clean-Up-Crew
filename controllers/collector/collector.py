@@ -8,7 +8,7 @@ if os.path.dirname(os.path.dirname(__file__)) not in sys.path:
 
 from lib_shared.communication import Communication
 from lib_shared.global_planner import AStarPlanner
-from lib_shared.map_module import visualise_robot_on_map, get_map
+from lib_shared.map_module import visualise_robot_on_map, get_map, debug_position
 from lib_shared.local_planner import DWA, _wrap
 
 WHEEL_RADIUS = 0.033
@@ -175,16 +175,15 @@ class Collector(Robot):
     def update_navigation(self):
         """Executes path following. Returns True if still moving, False if arrived."""
         now = self.getTime()
-
         # ----------- Visualisation ----------- #
         if now - self.last_vis > 0.5:
             vis_path = [self.grid.world_to_grid(wx, wz) for wx, wz in self.path_world]
             visualise_robot_on_map(self.grid, self.rx, self.rz, self.yaw, path=vis_path)
+            debug_position(self.grid, self.robot_id, self.rx, self.rz, self.yaw)
             self.last_vis = now
         # ------------------------------------- #
 
-        if not self.path_world:
-            return False  # No path -> arrived
+        if not self.path_world: return False  # No path -> arrived
 
         # Path Following Logic (Pure Pursuit / Lookahead)
         target = None
@@ -297,30 +296,6 @@ class Collector(Robot):
         else:
             print(f"[{self.robot_id}] Planning failed, remaining IDLE")
             self.current_task_id = None
-   
-    def debug_position(self):
-        """Print real GPS position vs mapped grid position."""
-        # Real position from GPS
-        if self.gps.getSamplingPeriod() > 0:
-            vals = self.gps.getValues()
-            real_x, real_y, real_z = vals[0], vals[1], vals[2]
-            
-            # Current mapped position (what code uses)
-            mapped_x, mapped_z = self.rx, self.rz
-            
-            # Convert to grid coordinates
-            grid_pos = self.grid.world_to_grid(mapped_x, mapped_z)
-            
-            print(f"\n{'='*60}")
-            print(f"[{self.robot_id}] POSITION DEBUG")
-            print(f"{'='*60}")
-            print(f"Real GPS:    X={real_x:.3f}, Y={real_y:.3f}, Z={real_z:.3f}")
-            print(f"Mapped:      rx={mapped_x:.3f}, rz={mapped_z:.3f}")
-            print(f"Grid:        row={grid_pos[0]}, col={grid_pos[1]}")
-            print(f"Grid origin: {self.grid.origin}")
-            print(f"Cell size:   {self.grid.cell_size:.3f}")
-            print(f"{'='*60}\n")
-            visualise_robot_on_map(self.grid, self.rx, self.rz, self.yaw)
 
     def handle_messages(self):
         """Process all incoming messages."""

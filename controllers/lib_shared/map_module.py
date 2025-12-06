@@ -81,6 +81,29 @@ def visualise_robot_on_map(grid: OccupancyGrid, rx: float, rz: float, yaw: float
                 line.append('.')    # Free space
         print(f"{r:02d} {''.join(line)}")
 
+
+# ============================================= #
+#                DEBUG FUNCTIONS                #
+# ============================================= #
+def debug_position(grid, robot_id, rx, ry, yaw):
+    """Print real GPS position vs mapped grid position."""
+    # Current mapped position (what code uses)
+    mapped_x, mapped_z = rx, ry
+    
+    # Convert to grid coordinates
+    grid_pos = grid.world_to_grid(mapped_x, mapped_z)
+    
+    print(f"\n{'='*60}")
+    print(f"[{robot_id}] POSITION DEBUG")
+    print(f"{'='*60}")
+    print(f"Real GPS:    X={rx:.3f}, Y={ry:.3f}, ANGLE:{yaw:.3f}")
+    print(f"Mapped:      rx={mapped_x:.3f}, rz={mapped_z:.3f}")
+    print(f"Grid:        row={grid_pos[0]}, col={grid_pos[1]}")
+    print(f"Grid origin: {grid.origin}")
+    print(f"Cell size:   {grid.cell_size:.3f}")
+    print(f"{'='*60}\n")
+
+
 def check_map_alignment(grid):
     print("Corner Check:")
     corners = [(0,0), (0, grid.width-1), (grid.height-1, 0), (grid.height-1, grid.width-1)]
