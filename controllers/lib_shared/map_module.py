@@ -1,8 +1,63 @@
 # ============================================= #
-#  WORLD REPR & POS DEBUG  -> AUTHOR: ZAHIN     #
+#  WORLD MAP & POS DEBUG     -> AUTHOR: ZAHIN   #
 # ============================================= #
 import math
-from .global_planner import OccupancyGrid
+from typing import Tuple
+
+class OccupancyGrid:
+    def __init__(self, width: int, height: int, cell_size: float, origin: Tuple[float, float]):
+        self.width, self.height = width, height
+        self.cell_size = cell_size
+        self.origin = origin
+        self.grid = [[0] * width for _ in range(height)]
+        self.max_y = origin[1] + height * cell_size
+
+    @classmethod
+    def from_string(cls, map_str: str, cell_size: float, origin: Tuple[float, float]) -> 'OccupancyGrid':
+        lines = [l.rstrip('\n') for l in map_str.strip().splitlines() if l.strip()]
+        h, w = len(lines), max(len(l) for l in lines)
+        obj = cls(w, h, cell_size, origin)
+        
+        for r, line in enumerate(lines):
+            for c, ch in enumerate(line):
+                if ch == '#':
+                    obj.grid[r][c] = 1
+        return obj
+
+    def world_to_grid(self, x: float, y: float) -> Tuple[int, int]:
+        row = math.floor((x - self.origin[0]) / self.cell_size)
+        col = math.floor((y - self.origin[1]) / self.cell_size)
+        return row, col
+
+    def grid_to_world(self, r: int, c: int) -> Tuple[float, float]:
+        x = r * self.cell_size + self.origin[0] + self.cell_size * 0.5
+        y = c * self.cell_size + self.origin[1] + self.cell_size * 0.5
+        return round(x, 2), round(y, 2)
+
+    # CRITICAL: Kept for API compatibility with your map_module.py
+    def is_valid(self, r: int, c: int) -> bool:
+        return 0 <= r < self.height and 0 <= c < self.width
+
+    def is_free(self, r: int, c: int) -> bool:
+        return self.is_valid(r, c) and self.grid[r][c] == 0
+
+    def inflate(self, radius: int) -> 'OccupancyGrid':
+        new_grid = OccupancyGrid(self.width, self.height, self.cell_size, self.origin)
+        # Deep copy the grid to avoid reference issues
+        new_grid.grid = [row[:] for row in self.grid]
+        
+        obstacles = [(r, c) for r in range(self.height) for c in range(self.width) if self.grid[r][c] != 0]
+        for r, c in obstacles:
+            # Optimized bounds to avoid checking indices that will definitely be invalid
+            r_min = max(0, r - radius)
+            r_max = min(self.height, r + radius + 1)
+            c_min = max(0, c - radius)
+            c_max = min(self.width, c + radius + 1)
+            
+            for nr in range(r_min, r_max):
+                for nc in range(c_min, c_max):
+                    new_grid.grid[nr][nc] = 1
+        return new_grid
 
 # --- CONFIGURATION ---
 GRID_W, GRID_H = 36, 24 # cells
@@ -58,9 +113,9 @@ def visualise_robot_on_map(grid: OccupancyGrid, rx: float, rz: float, yaw: float
         print(f"ROBOT OUT OF BOUNDS! Grid: {r_grid}")
         return
 
-    # Define View Window (Simple centering around the robot)
-    VIEW_RADIUS_R = 10  # Rows
-    VIEW_RADIUS_C = 17  # Columns
+    # View Window -> Simple centering around bot for visualisation
+    VIEW_RADIUS_R = 6  # Rows
+    VIEW_RADIUS_C = 10  # Columns
 
     center_r, center_c = r_grid
     
@@ -69,6 +124,7 @@ def visualise_robot_on_map(grid: OccupancyGrid, rx: float, rz: float, yaw: float
 
     start_c = max(0, center_c - VIEW_RADIUS_C)
     end_c = min(grid.width, center_c + VIEW_RADIUS_C + 1)
+    
     
     #  For each row print the cells as # . + →
     for r in range(start_r, end_r):

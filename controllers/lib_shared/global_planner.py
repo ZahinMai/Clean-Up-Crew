@@ -5,62 +5,7 @@
 import math
 from heapq import heappush, heappop
 from typing import List, Tuple, Optional, Dict
-
-# Simple grid map where 0=free, 1=obstacle. Coordinates: (row, col).
-class OccupancyGrid:
-    def __init__(self, width: int, height: int, cell_size: float, origin: Tuple[float, float]):
-        self.width, self.height = width, height
-        self.cell_size = cell_size
-        self.origin = origin
-        self.grid = [[0] * width for _ in range(height)]
-        self.max_y = origin[1] + height * cell_size
-
-    @classmethod
-    def from_string(cls, map_str: str, cell_size: float, origin: Tuple[float, float]) -> 'OccupancyGrid':
-        lines = [l.rstrip('\n') for l in map_str.strip().splitlines() if l.strip()]
-        h, w = len(lines), max(len(l) for l in lines)
-        obj = cls(w, h, cell_size, origin)
-        for r, line in enumerate(lines):
-            for c, ch in enumerate(line):
-                if ch == '#':
-                    obj.grid[r][c] = 1
-        return obj
-
-    def world_to_grid(self, x: float, y: float) -> Tuple[int, int]:
-        row = math.floor((x - self.origin[0]) / self.cell_size)
-        col = math.floor((y - self.origin[1]) / self.cell_size)
-        return row, col
-
-    def grid_to_world(self, r: int, c: int) -> Tuple[float, float]:
-        x = r * self.cell_size + self.origin[0] + self.cell_size * 0.5
-        y = c * self.cell_size + self.origin[1] + self.cell_size * 0.5
-        return round(x, 2), round(y, 2)
-
-    # CRITICAL: Kept for API compatibility with your map_module.py
-    def is_valid(self, r: int, c: int) -> bool:
-        return 0 <= r < self.height and 0 <= c < self.width
-
-    def is_free(self, r: int, c: int) -> bool:
-        return self.is_valid(r, c) and self.grid[r][c] == 0
-
-    def inflate(self, radius: int) -> 'OccupancyGrid':
-        new_grid = OccupancyGrid(self.width, self.height, self.cell_size, self.origin)
-        # Deep copy the grid to avoid reference issues
-        new_grid.grid = [row[:] for row in self.grid]
-        
-        obstacles = [(r, c) for r in range(self.height) for c in range(self.width) if self.grid[r][c] != 0]
-        for r, c in obstacles:
-            # Optimized bounds to avoid checking indices that will definitely be invalid
-            r_min = max(0, r - radius)
-            r_max = min(self.height, r + radius + 1)
-            c_min = max(0, c - radius)
-            c_max = min(self.width, c + radius + 1)
-            
-            for nr in range(r_min, r_max):
-                for nc in range(c_min, c_max):
-                    new_grid.grid[nr][nc] = 1
-        return new_grid
-
+from .map_module import OccupancyGrid
 
 # Uses 8 directional movement, Euclidean distance heuristic, and path smoothing
 class AStarPlanner:
@@ -75,9 +20,8 @@ class AStarPlanner:
         if not (grid.is_free(*start) and grid.is_free(*goal)):
             return None
 
-        # Optimization: Use Parent Pointers (came_from) instead of storing full path in heap.
-        # Heap items: (f_score, start_node)
-        queue = [(0.0, start)]
+        # Parent Pointers prevent storing full path in heap.
+        queue = [(0.0, start)] # Heap items: (f_score, start_node)
         
         g_scores = {start: 0.0}
         came_from: Dict[Tuple[int, int], Tuple[int, int]] = {}

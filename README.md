@@ -27,13 +27,13 @@ We simulate a cafeteria environment with scattered rubbish (red/green objects) a
 The project is built on a modular Python controller framework within Webots. We decouple **Navigation Logic** from **Task Coordination** to isolate the performance metrics of the team strategy.
 
 ### Overview
-![alt text](image-1.png)
+![alt text](lta_logic.png)
 
 ### Components
-![alt text](image.png)
+![alt text](lta_components.png)
 
 ### Logic
-![alt text](image-2.png)
+![alt text](lta_sequence.png)
 
 
 ### 1. The Controller Stack
