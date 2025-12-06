@@ -10,16 +10,13 @@ class SpotterTester(Robot):
         self.timestep = int(self.getBasicTimeStep())
         self.robot_id = self.getName()
         
-        # Communication
         self.emitter = self.getDevice('emitter')
         self.receiver = self.getDevice('receiver')
         self.receiver.enable(self.timestep)
         
-        # GPS
         self.gps = self.getDevice('gps')
         self.gps.enable(self.timestep)
         
-        # Keyboard
         self.keyboard = Keyboard()
         self.keyboard.enable(self.timestep)
         
@@ -38,7 +35,7 @@ class SpotterTester(Robot):
         
         # Test locations
         self.test_locations = [
-            (-2.5, -3.5, "Table 1"),
+            (-4, -5, "Table 1"),
             (0.0, 0.0, "Center"),
             (2.5, 3.5, "Table 8"),
             (-2.5, 3.5, "Table 6"),
@@ -50,7 +47,6 @@ class SpotterTester(Robot):
     def print_header(self):
         print("\n" + "="*70)
         print("SPOTTER AUCTION TEST")
-        print("="*70)
         if self.manual:
             print("Controls: [A] Auction [S] Status [R] Reset [Q] Quit")
         print("="*70 + "\n")
@@ -88,7 +84,7 @@ class SpotterTester(Robot):
             if task_id not in self.bids_received:
                 self.bids_received[task_id] = []
             self.bids_received[task_id].append((spotter_id, cost))
-            print(f"   -> BID {spotter_id}: ${cost:.2f} for task {task_id}")
+            print(f"   -> BID {spotter_id}: {cost:.2f} for task {task_id}")
 
     def process_complete(self, msg):
         spotter_id = msg.get("collector_id")
@@ -128,7 +124,7 @@ class SpotterTester(Robot):
         
         print(f"\nLowest path cost {winner_cost:.2f} ({winner_id})")
         for sid, cost in sorted(bids, key=lambda x: x[1]):
-            print(f"  {'>' if sid == winner_id else '  '} {sid}: ${cost:.2f}")
+            print(f"  {' ->' if sid == winner_id else '  '} {sid}: {cost:.2f}")
         
         _, idx = self.pending_assignment
         x, z, _ = self.test_locations[idx]
@@ -166,23 +162,21 @@ class SpotterTester(Robot):
         elif key == ord('S'):
             self.print_status()
         elif key == ord('R'):
-            print("🔄 Reset")
+            print("Reset")
             self.current_task_id = 0
             self.tasks_completed = 0
             self.bids_received = {}
             self.pending_assignment = None
         elif key == ord('Q'):
-            print("👋 Quit")
+            print("Quit")
             self.simulationQuit(0)
 
     def run_auto(self):
         now = self.getTime()
         
         if self.test_phase == 0:
-            if now < 5.0:
-                return
-            if len(self.spotters_idle) < 1:
-                return
+            if now < 5.0: return
+            if len(self.spotters_idle) < 1:  return
             self.print_status()
             print("▶ Starting automated tests\n")
             self.test_phase = 1

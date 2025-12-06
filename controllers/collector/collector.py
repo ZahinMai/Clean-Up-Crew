@@ -59,7 +59,7 @@ class Collector(Robot):
 
         # ---------- Planning Setup ----------- #
         self.grid = get_map(verbose=False)
-        self.plan_grid = self.grid.inflate(0)
+        self.plan_grid = self.grid.inflate(1)
         self.astar = AStarPlanner()
         self.dwa = DWA(params=DWA_CONFIG)
         # ------------------------------------- #
@@ -72,14 +72,14 @@ class Collector(Robot):
         self.rx = self.rz = self.yaw = 0.0
         # ------------------------------------- #
 
-        print(f"[{self.robot_id}] Initialized in IDLE state")
+        print(f"[{self.robot_id}] Initialised in IDLE state")
 
     def update_pose(self):
         """Read GPS, IMU/compass & update internal pose (rx, rz, yaw)."""
         if self.gps.getSamplingPeriod() > 0:
             self.rx, self.rz = self.gps.getValues()[0], self.gps.getValues()[1]
         if self.imu.getSamplingPeriod() > 0:
-            self.yaw = self.imu.getRollPitchYaw()[2] - math.pi/2
+            self.yaw = self.imu.getRollPitchYaw()[2]
         elif self.compass.getSamplingPeriod() > 0:
             v = self.compass.getValues()
             self.yaw = math.atan2(v[0], v[2])
@@ -140,7 +140,7 @@ class Collector(Robot):
             wx, wz = self.path_world[self.path_idx]
             if math.hypot(wx - self.rx, wz - self.rz) < .25: self.path_idx += 1
             else:
-                target = self.path_world[min(self.path_idx + 1, len(self.path_world)-1)]
+                target = self.path_world[min(self.path_idx + 2, len(self.path_world)-1)]
                 break
 
         if not target:

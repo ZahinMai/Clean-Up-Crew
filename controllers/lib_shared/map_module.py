@@ -101,10 +101,11 @@ def visualise_robot_on_map(grid: OccupancyGrid, rx: float, rz: float, yaw: float
     
     # Prepare Path and Heading
     path_set = set(path) if path else set()
-    angle = yaw % (2 * math.pi)
+    vis_angle = yaw - math.pi/2 
+    angle = vis_angle % (2 * math.pi)
     sector = int((angle + math.pi/8) / (math.pi/4)) % 8
     arrows_ccw = ['→', '↗', '↑', '↖', '←', '↙', '↓', '↘']
-    arrow = arrows_ccw[sector]
+    arrow = arrows_ccw[sector-2]
 
     print(f"\nMap: Robot {r_grid} {arrow} | World ({rx:.2f}, {rz:.2f})")
     
