@@ -2,7 +2,7 @@
 
 **A Webots simulation benchmarking the efficiency of independent swarms versus coordinated teams.**
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue) ![Webots](https://img.shields.io/badge/Webots-R2023b-red) ![Status](https://img.shields.io/badge/Status-Active-success)
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue) ![Webots](https://img.shields.io/badge/Webots-R2025a-red) ![Status](https://img.shields.io/badge/Status-Active-success)
 
 ## "Too Many Cooks" (or "Too Many Cleaners")
 In theory, adding more robots should improve task performance. In practice, robots can waste effort through path overlap, item contention, and collisions. Coordination promises efficiency, but also introduces overhead. One study shows how cleaning success rises by only about 6.8% when moving from a single-robot baseline to a two-robot team (Patil, Banavar and Narayanan, 2023).
