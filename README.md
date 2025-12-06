@@ -2,7 +2,7 @@
 
 **A Webots simulation benchmarking the efficiency of independent swarms versus coordinated teams.**
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue) ![Webots](https://img.shields.io/badge/Webots-R2023b-red) ![Status](https://img.shields.io/badge/Status-Active-success)
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue) ![Webots](https://img.shields.io/badge/Webots-R2025a-red) ![Status](https://img.shields.io/badge/Status-Active-success)
 
 ## "Too Many Cooks" (or "Too Many Cleaners")
 In theory, adding more robots should improve task performance. In practice, robots can waste effort through path overlap, item contention, and collisions. Coordination promises efficiency, but also introduces overhead. One study shows how cleaning success rises by only about 6.8% when moving from a single-robot baseline to a two-robot team (Patil, Banavar and Narayanan, 2023).
@@ -16,15 +16,13 @@ We simulate a cafeteria environment with scattered rubbish (red/green objects) a
 
 | Setup | Architecture | Description |
 | :--- | :--- | :--- |
-| **1. Baseline** | Single Agent | One general-purpose robot scanning and cleaning alone. |
-| **2. Swarm** | Independent | Three general-purpose robots working simultaneously but **without communication**. |
-| **3. Coordinated** | **Spotter-Collector** | One static "Spotter" (high vantage) directing two mobile "Collectors" via comms. |
+| **Baseline** | Single Agent | One general-purpose robot scanning and cleaning alone. |
+| **Swarm** | Independent | Three general-purpose robots working simultaneously but **without communication**. |
+| **Coordinated** | **Spotter-Collector** | One static "Spotter" (high vantage) directing two mobile "Collectors" via comms. |
 
 ---
 
 ## System Architecture
-
-The project is built on a modular Python controller framework within Webots. We decouple **Navigation Logic** from **Task Coordination** to isolate the performance metrics of the team strategy.
 
 ### Overview
 ![alt text](lta_logic.png)
@@ -45,7 +43,7 @@ Each robot operates on a layered architecture:
 * **Action Layer:** Translates target vectors into motor velocities (differential drive).
 
 ### 2. Communication Protocol (Setup 3)
-The Coordinated setup utilizes the Webots `Emitter` and `Receiver` nodes to simulate a local area network.
+The Coordinated setup utilises the Webots `Emitter` and `Receiver` nodes to simulate a local area network.
 * **The Spotter:** Uses a ceiling-mounted camera to segment the arena. When rubbish is detected, it broadcasts a packet: `{ID, Coordinates(x,y), Priority}`.
 * **The Collectors:** operate as "blind" workers. They do not scan for trash; they simply execute the navigation stack based on received coordinates, reducing redundant path overlap.
 
