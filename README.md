@@ -16,15 +16,13 @@ We simulate a cafeteria environment with scattered rubbish (red/green objects) a
 
 | Setup | Architecture | Description |
 | :--- | :--- | :--- |
-| **1. Baseline** | Single Agent | One general-purpose robot scanning and cleaning alone. |
-| **2. Swarm** | Independent | Three general-purpose robots working simultaneously but **without communication**. |
-| **3. Coordinated** | **Spotter-Collector** | One static "Spotter" (high vantage) directing two mobile "Collectors" via comms. |
+| **Baseline** | Single Agent | One general-purpose robot scanning and cleaning alone. |
+| **Swarm** | Independent | Three general-purpose robots working simultaneously but **without communication**. |
+| **Coordinated** | **Spotter-Collector** | One static "Spotter" (high vantage) directing two mobile "Collectors" via comms. |
 
 ---
 
 ## System Architecture
-
-The project is built on a modular Python controller framework within Webots. We decouple **Navigation Logic** from **Task Coordination** to isolate the performance metrics of the team strategy.
 
 ### Overview
 ![alt text](image-1.png)
@@ -45,7 +43,7 @@ Each robot operates on a layered architecture:
 * **Action Layer:** Translates target vectors into motor velocities (differential drive).
 
 ### 2. Communication Protocol (Setup 3)
-The Coordinated setup utilizes the Webots `Emitter` and `Receiver` nodes to simulate a local area network.
+The Coordinated setup utilises the Webots `Emitter` and `Receiver` nodes to simulate a local area network.
 * **The Spotter:** Uses a ceiling-mounted camera to segment the arena. When rubbish is detected, it broadcasts a packet: `{ID, Coordinates(x,y), Priority}`.
 * **The Collectors:** operate as "blind" workers. They do not scan for trash; they simply execute the navigation stack based on received coordinates, reducing redundant path overlap.
 
