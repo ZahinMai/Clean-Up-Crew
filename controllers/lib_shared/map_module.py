@@ -107,7 +107,7 @@ def get_map(verbose=False) -> OccupancyGrid:
     return OccupancyGrid.from_string(CAFETERIA_MAP, DEFAULT_CELL_SIZE, ORIGIN)
 
 
-def visualise_robot_on_map(grid: OccupancyGrid, rx: float, rz: float, yaw: float, robot_id=None, path=None):
+def visualise_robot_on_map(grid: OccupancyGrid, rx: float, rz: float, yaw: float, path=None):
     r_bot, c_bot = grid.world_to_grid(rx, rz)
     path_set = set(path) if path else set()
 

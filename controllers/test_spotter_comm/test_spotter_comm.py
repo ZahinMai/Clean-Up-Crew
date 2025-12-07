@@ -99,7 +99,7 @@ class SpotterTester(Robot):
                 msg_str = self.receiver.getString()
                 messages.append(json.loads(msg_str))
             except Exception as e:
-                print(f"⚠ Parse error: {e}")
+                print(f"Parse error: {e}")
             finally:
                 self.receiver.nextPacket()
         return messages
@@ -117,7 +117,6 @@ class SpotterTester(Robot):
             if collector_id in self.spotters_busy:
                 self.spotters_busy.remove(collector_id)
             self.spotters_idle[collector_id] = tuple(pos)
-            print(f"✓ {collector_id} IDLE at ({pos[0]:.2f}, {pos[1]:.2f})")
     
     def process_bid(self, msg):
         """Handle robot bid for auction."""
@@ -291,7 +290,6 @@ class SpotterTester(Robot):
         
         # Phase 99: Test complete, save report
         elif self.test_phase == 99:
-            print("\n" + "="*70)
             print("✓ TEST COMPLETE")
             print(f"Auctions: {self.current_task_id}")
             print(f"Completed: {self.tasks_completed}")

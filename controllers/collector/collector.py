@@ -5,6 +5,7 @@
 # Multi-agent collector that participates in auction system, uses A* for
 # global planning, optional DWA for local avoidance. FSM: IDLE ↔ NAVIGATING
 # =============================================================================
+
 from controller import Robot
 import math, os, sys
 from collections import deque
@@ -85,7 +86,7 @@ class Collector(Robot):
         self.prev_cmd = (0.0, 0.0)
         self.rx = self.ry = self.yaw = 0.0
 
-        print(f"[{self.robot_id}] Initialised in IDLE state")
+        print(f"Initialised in IDLE state")
 
     def update_pose(self):
         """Update robot pose from sensors."""
@@ -97,7 +98,7 @@ class Collector(Robot):
     def send_idle_status(self):
         """Broadcast idle state and current location."""
         success = self.comm.send({"event": "idle", "collector_id": self.robot_id, "pos": [self.rx, self.ry]})
-        if success: print(f"[{self.robot_id}] Broadcast IDLE at ({self.rx:.2f}, {self.ry:.2f})")
+        if success: print(f"Broadcast IDLE at ({self.rx:.2f}, {self.ry:.2f})")
         return success
 
     def find_nearest_free(self, node):
@@ -115,22 +116,22 @@ class Collector(Robot):
 
     def plan_path(self, gx, gz):
         """Plan A* path from current position to goal."""
-        print(f"[{self.robot_id}] Planning: ({self.rx:.2f},{self.ry:.2f}) → ({gx:.2f},{gz:.2f})")
+        print(f"Planning: ({self.rx:.2f},{self.ry:.2f}) → ({gx:.2f},{gz:.2f})")
         
         start = self.find_nearest_free(self.plan_grid.world_to_grid(self.rx, self.ry))
         goal = self.find_nearest_free(self.plan_grid.world_to_grid(gx, gz))
         
         if not start or not goal:
-            print(f"[{self.robot_id}] ERROR: Invalid start/goal"); return False
+            print(f"ERROR: Invalid start/goal"); return False
 
         nodes = self.astar.plan(self.plan_grid, start, goal)
         if nodes:
             self.path_world = [self.grid.grid_to_world(r, c) for r, c in nodes]
             self.path_idx, self.current_goal = 0, (gx, gz)
-            print(f"[{self.robot_id}] ✓ Path found: {len(nodes)} waypoints")
+            print(f"✓ Path found: {len(nodes)} waypoints")
             return True
         
-        print(f"[{self.robot_id}] ERROR: No path found"); return False
+        print(f"ERROR: No path found"); return False
 
     def get_min_obstacle_distance(self, lidar_pts):
         """Get minimum distance to nearest obstacle."""
@@ -142,7 +143,7 @@ class Collector(Robot):
         now = self.getTime()
         
         # Visualize path periodically (collector_2 only)
-        if now - self.last_vis > 2 and self.robot_id == "collector_2":
+        if now - self.last_vis > 2:
             vis = [self.grid.world_to_grid(x, z) for x, z in self.path_world]
             visualise_robot_on_map(self.grid, self.rx, self.ry, self.yaw, path=vis)
             self.last_vis = now
@@ -181,8 +182,9 @@ class Collector(Robot):
             w = max(-2.0, min(2.0, -2.5*ang))
             
             # Slow down near obstacles
-            if min_obs_dist < 0.1:
-                v *= 0.8
+            if min_obs_dist < 0.09:
+                # closer the obstacle, slower the robot
+                v *= min_obs_dist
             
             # Turn in place for large angle errors
             if abs(ang) > 0.5:
@@ -202,12 +204,12 @@ class Collector(Robot):
         if self.state != "IDLE": return
         task_id, pos = msg.get("task_id"), msg.get("pos")
         if not task_id or not pos:
-            print(f"[{self.robot_id}] ERROR: Invalid auction message"); return
+            print(f"ERROR: Invalid auction message"); return
         
         tx, ty = pos
         cost = math.hypot(tx - self.rx, ty - self.ry)
         self.comm.send({"event": "bid", "collector_id": self.robot_id, "task_id": task_id, "cost": cost})
-        print(f"[{self.robot_id}] Bid {cost:.2f} for task_{task_id}")
+        print(f"Bid {cost:.2f} for task_{task_id}")
 
     def handle_task_assignment(self, msg):
         """Accept task and transition to NAVIGATING."""
@@ -215,15 +217,15 @@ class Collector(Robot):
         
         task_id, x, z = msg.get("task_id"), msg.get("target_x"), msg.get("target_z")
         if None in [task_id, x, z]:
-            print(f"[{self.robot_id}] ERROR: Invalid task assignment"); return
+            print(f"ERROR: Invalid task assignment"); return
 
-        print(f"[{self.robot_id}] Assigned {task_id} → ({x:.2f}, {z:.2f})")
+        print(f"Assigned {task_id} → ({x:.2f}, {z:.2f})")
         self.current_task_id = task_id
 
         if self.plan_path(x, z):
             self.state = "NAVIGATING"
         else:
-            print(f"[{self.robot_id}] Planning failed, staying IDLE")
+            print(f"Planning failed, staying IDLE")
             self.current_task_id = None
 
     def handle_messages(self):
@@ -235,10 +237,6 @@ class Collector(Robot):
         if event == "auction_start": self.handle_auction_start(msg)
         elif event == "assign_task": self.handle_task_assignment(msg)
 
-    def cleanup(self):
-        """Stop logger and save to file."""
-        self.logger.stop()
-        self.logger.save()
 
     def run(self):
         """Main control loop with finite state machine."""
@@ -263,9 +261,7 @@ class Collector(Robot):
                         self.comm.send({"event": "collected", "collector_id": self.robot_id, "task_id": self.current_task_id})
                         self.current_task_id, self.path_world, self.state = None, [], "IDLE"
         
-        finally:
-            # Always save logs on exit
-            self.cleanup()
+        finally: self.logger.stop()
 
 if __name__ == "__main__":
     Collector().run()
