@@ -123,7 +123,7 @@ CeilingLight {
   pointLightCastShadows TRUE
 }
 Table {
-  translation -2.5 -3.5 0
+  translation -2.4 -3.5 0
   size 1 1.6 0.74
   feetSize 0.05 0.05
   legAppearance MattePaint {
@@ -131,20 +131,20 @@ Table {
   }
 }
 Chair {
-  translation -2.5 -4.2 0
+  translation -2.4 -4.2 0
   rotation 0 0 1 1.5708
 }
 Chair {
-  translation -2.5 -2.8 0
+  translation -2.4 -2.8 0
   rotation 0 0 1 -1.5708
   name "chair_1"
 }
 Chair {
-  translation -2.9 -3.5 0
+  translation -2.8 -3.6 0
   name "chair_2"
 }
 Chair {
-  translation -2.1 -3.5 0
+  translation -2.0 -3.6 0
   rotation 0 0 1 3.14159
   name "chair_3"
 }
@@ -177,7 +177,7 @@ Chair {
   name "chair_7"
 }
 Table {
-  translation 2.5 -3.5 0
+  translation 2.4 -3.5 0
   name "table_2"
   size 1 1.6 0.74
   feetSize 0.05 0.05
@@ -205,7 +205,7 @@ Chair {
   name "chair_11"
 }
 Table {
-  translation -2.5 0 0
+  translation -2.4 0 0
   name "table_3"
   size 1 1.6 0.74
   feetSize 0.05 0.05
@@ -214,21 +214,21 @@ Table {
   }
 }
 Chair {
-  translation -2.5 -0.7 0
+  translation -2.4 -0.7 0
   rotation 0 0 1 1.5708
   name "chair_12"
 }
 Chair {
-  translation -2.5 0.7 0
+  translation -2.4 0.7 0
   rotation 0 0 1 -1.5708
   name "chair_13"
 }
 Chair {
-  translation -2.9 0 0
+  translation -2.8 0 0
   name "chair_14"
 }
 Chair {
-  translation -2.1 0 0
+  translation -2.0 0 0
   rotation 0 0 1 3.14159
   name "chair_15"
 }
@@ -260,7 +260,7 @@ Chair {
   name "chair_19"
 }
 Table {
-  translation 2.5 0 0
+  translation 2.4 0 0
   name "table_5"
   size 1 1.6 0.74
   feetSize 0.05 0.05
@@ -269,12 +269,12 @@ Table {
   }
 }
 Chair {
-  translation 2.5 -0.7 0
+  translation 2.4 -0.7 0
   rotation 0 0 1 1.5708
   name "chair_20"
 }
 Chair {
-  translation 2.5 0.7 0
+  translation 2.4 0.7 0
   rotation 0 0 1 -1.5708
   name "chair_21"
 }
@@ -283,12 +283,12 @@ Chair {
   name "chair_22"
 }
 Chair {
-  translation 2.9 0 0
+  translation 2.8 0 0
   rotation 0 0 1 3.14159
   name "chair_23"
 }
 Table {
-  translation -2.5 3.5 0
+  translation -2.4 3.5 0
   name "table_6"
   size 1 1.6 0.74
   feetSize 0.05 0.05
@@ -297,17 +297,17 @@ Table {
   }
 }
 Chair {
-  translation -2.5 2.8 0
+  translation -2.4 2.8 0
   rotation 0 0 1 1.5708
   name "chair_24"
 }
 Chair {
-  translation -2.5 4.2 0
+  translation -2.4 4.2 0
   rotation 0 0 1 -1.5708
   name "chair_25"
 }
 Chair {
-  translation -2.9 3.5 0
+  translation -2.8 3.5 0
   name "chair_26"
 }
 Chair {
@@ -344,7 +344,7 @@ Chair {
   name "chair_31"
 }
 Table {
-  translation 2.5 3.5 0
+  translation 2.4 3.5 0
   name "table_8"
   size 1 1.6 0.74
   feetSize 0.05 0.05
@@ -378,7 +378,7 @@ DEF collector_1 TurtleBot3Burger {
   hidden position2_0_2 -0.638999761979814
   hidden position3_0_2 -720.0567130883838
   hidden rotation_12 0 -1 0 2.935782986447993
-  hidden rotation_13 -0.6964288669940077 2.326533419463164e-06 0.7176258309258594 3.1415927233533636
+  hidden rotation_13 -0.6964288669940077 2.326533419462679e-06 0.7176258309258593 3.1415927233533636
   hidden rotation_14 -0.18782520426652888 -0.44721156653926347 0.8744847096409031 2.357323756698986
   translation -1.2 0 -0.000247953
   rotation 0.0023095630477368814 0 0.9999973329557077 1.5707884126070442
@@ -405,8 +405,8 @@ DEF collector_2 TurtleBot3Burger {
   hidden position_0_2 -465.3740854637887
   hidden position2_0_2 -1.8140564528991743
   hidden position3_0_2 259.3456932289134
-  hidden rotation_12 0 0.9999999999999999 0 2.3099187175499196
-  hidden rotation_13 0.3106101881458261 1.0528615083773128e-06 0.9505373801271081 3.1415968035088935
+  hidden rotation_12 0 0.9999999999999999 0 2.309918717549919
+  hidden rotation_13 0.3106101881458261 1.05286150841355e-06 0.950537380127108 3.1415968035088935
   hidden rotation_14 0.6952906009870392 0.4155532907098335 -0.5864183172099164 3.6779482664368337
   translation 1.2 0 -0.000211441
   rotation 0.003281598389754044 0 0.9999946155415079 1.5723841283161906
@@ -433,17 +433,11 @@ TurtleBot3Burger {
   hidden position_0_2 12.308179703355991
   hidden position2_0_2 0.16057139664620346
   hidden position3_0_2 -725.2392376905582
-  hidden linearVelocity_0 2.383812576919599e-09 -2.95727258692622e-06 -6.134999811167324e-12
+  hidden linearVelocity_0 2.383812576919599e-09 -2.85727258692622e-06 -6.134999811167324e-12
   hidden angularVelocity_0 -3.999502716467011e-08 2.4154871873298884e-10 -1.052070375233764e-06
   hidden rotation_9 0 1 0 1.9521920147156702
-  hidden linearVelocity_9 -8.214698737381496e-08 -1.9146151897355395e-06 3.12962236665896e-09
-  hidden angularVelocity_9 5.6110090921416205e-05 -2.545453471758167 0.00037418674858708234
-  hidden rotation_10 -0.7393345592756937 1.0858979078751865e-07 -0.6733382578322757 3.141588005070566
-  hidden linearVelocity_10 8.655713063416922e-08 -4.070847370155513e-06 -3.1459552013549354e-09
-  hidden angularVelocity_10 0.0001470578727538329 -6.669998873353623 0.0009821652315398462
+  hidden rotation_10 -0.7393345592756938 1.0858979079061923e-07 -0.6733382578322756 3.1415880050705653
   hidden rotation_11 0.10983214453721678 0.10900634693346109 0.9879547137164629 3.5841505958934023
-  hidden linearVelocity_11 2.191395256593242e-09 -2.908601586621303e-06 1.2295608193140186e-11
-  hidden angularVelocity_11 0.0007271503722882826 5.478487957897209e-07 7.06921534823289e-21
   translation -0.35093485508509414 -0.7729774631928618 -0.0003605596743210468
   rotation -0.06527229603848199 0.9978205376973965 0.009679975162341203 0.0022588777429292913
   name "HumanAgent"
@@ -462,7 +456,7 @@ E-puck {
   hidden rotation_2 0 1 0 1.5485740967710712e-07
   translation -1.9999999999999996 -5.000000000000001 -6.396199560286878e-05
   rotation 0.1749520445704636 0.12374811876254059 0.9767692589364936 1.4017554061570958e-08
-  controller "test_spotter"
+  controller "test_spotter_comm"
   window "<none>"
   turretSlot [
     Compass {

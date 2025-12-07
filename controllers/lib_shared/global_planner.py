@@ -1,7 +1,6 @@
 # ============================================= #
 #  A* PATH PLANNING        -> AUTHOR: ZAHIN     #
 # ============================================= #
-
 import math
 from heapq import heappush, heappop
 from typing import List, Tuple, Optional, Dict

@@ -9,7 +9,7 @@ The `SpotterTester` controller issues auction requests for trash collection. The
 
 ## Setup
 1. Open the Webots world file.
-2. Ensure the `SpotterTester` supervisor is present in the scene tree.
+2. Ensure the `SpotterTester` bot is present in the scene tree.
 3. Ensure at least **2 Collector Bots** are placed in the arena.
 4. Ensure the **Human Worker** (dynamic obstacle) is active/moving.
 
@@ -17,10 +17,10 @@ The `SpotterTester` controller issues auction requests for trash collection. The
 The system runs in **Automated Mode** by default.
 
 1. **Press Play** in Webots.
-2. Wait 5 seconds for system initialization.
-3. The `SpotterTester` will automatically cycle through 5 scenarios.
+2. Wait for system initialisation.
+3. `SpotterTester` will automatically cycle through 5 scenarios.
 4. Watch the **Console** for real-time logs.
-5. Watch the **3D View** for robot behavior.
+5. Watch the **3D View** for robot behaviour (important!)
 
 ### Manual Override
 If you want to trigger tests one by one:

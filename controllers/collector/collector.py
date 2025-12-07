@@ -1,6 +1,10 @@
-# ================================================ #
-#  CONTROLLER FOR ALL COLLECTORS  -> AUTHOR: ZAHIN #
-# ================================================ #
+# =============================================================================
+# COLLECTOR ROBOT - Auction-Based Task Assignment with A* Navigation
+# Author: ZAHIN
+# =============================================================================
+# Multi-agent collector that participates in auction system, uses A* for
+# global planning, optional DWA for local avoidance. FSM: IDLE ↔ NAVIGATING
+# =============================================================================
 from controller import Robot
 import math, os, sys
 from collections import deque
@@ -13,15 +17,20 @@ from lib_shared.communication import Communication
 from lib_shared.global_planner import AStarPlanner
 from lib_shared.map_module import visualise_robot_on_map, get_map
 from lib_shared.local_planner import DWA, _wrap
+from lib_shared.dual_logger import Logger
 
-WHEEL_RADIUS = 0.033
+# =============================================================================
+# CONFIGURATION & UTILITIES
+# =============================================================================
+
+WHEEL_RADIUS = 0.0325
 AXLE_LENGTH = 0.16
-DWA_ENABLED = False
+DWA_ENABLED = False  # Toggle for DWA vs simple controller
 
 DWA_CONFIG = {
     'DT_SIM': 0.25, 'T_PRED': 1.0, 'NV': 7, 'NW': 10, 'V_MAX': 0.35, 'W_MAX': 2.0,
     'A_V': 1.0, 'A_W': 2.0, 'RADIUS': 0.09, 'SAFE': 0.15, 'ALPHA': 0.5, 'BETA': 0.3,
-    'GAMMA': 0.1, 'DELTA': 0.1, 'EPS': 0.1, 'LIDAR_SKIP': 4,
+    'GAMMA': 0.1, 'DELTA': 0.1, 'EPS': 0.1, 'LIDAR_SKIP': 5,
 }
 
 def get_lidar_points(lidar, max_r=3.5, min_r=0.1):
@@ -35,13 +44,25 @@ def get_lidar_points(lidar, max_r=3.5, min_r=0.1):
     return [(r*math.cos(-fov/2 + i/(n-1)*fov), r*math.sin(-fov/2 + i/(n-1)*fov))
             for i, r in enumerate(ranges) if min_r <= r <= max_r and math.isfinite(r)]
 
+# =============================================================================
+# COLLECTOR ROBOT
+# =============================================================================
 
 class Collector(Robot):
+    """Auction-based collector robot with A* navigation."""
     def __init__(self):
         super().__init__()
+        
+        # Basic setup
         self.timestep = int(self.getBasicTimeStep())
         self.robot_id = self.getName()
         self.state = "IDLE"
+        
+        # Setup logging
+        self.logger = Logger(prefix=self.robot_id, enabled=True)
+        self.logger.start()
+        
+        # Communication
         self.comm = Communication(self, channel=1)
 
         # ------ Sensor & Actuator Setup ------ #
@@ -50,14 +71,12 @@ class Collector(Robot):
         self.lidar = self.getDevice('LDS-01'); self.lidar.enable(self.timestep); self.lidar.enablePointCloud()
         self.lm = self.getDevice('left wheel motor'); self.lm.setPosition(float('inf')); self.lm.setVelocity(0)
         self.rm = self.getDevice('right wheel motor'); self.rm.setPosition(float('inf')); self.rm.setVelocity(0)
-        # ------------------------------------- #
 
         # ---------- Planning Setup ----------- #
         self.grid = get_map(verbose=False)
         self.plan_grid = self.grid.inflate(0)
         self.astar = AStarPlanner()
         self.dwa = DWA(params=DWA_CONFIG)
-        # ------------------------------------- #
 
         # ---------- Navigation Setup ---------- #
         self.path_world, self.path_idx = [], 0
@@ -65,7 +84,6 @@ class Collector(Robot):
         self.last_replan = self.last_vis = self.last_idle_broadcast = 0.0
         self.prev_cmd = (0.0, 0.0)
         self.rx = self.ry = self.yaw = 0.0
-        # ------------------------------------- #
 
         print(f"[{self.robot_id}] Initialised in IDLE state")
 
@@ -122,6 +140,8 @@ class Collector(Robot):
     def update_navigation(self):
         """Execute path following. Returns True if still moving."""
         now = self.getTime()
+        
+        # Visualize path periodically (collector_2 only)
         if now - self.last_vis > 2 and self.robot_id == "collector_2":
             vis = [self.grid.world_to_grid(x, z) for x, z in self.path_world]
             visualise_robot_on_map(self.grid, self.rx, self.ry, self.yaw, path=vis)
@@ -136,7 +156,7 @@ class Collector(Robot):
             if math.hypot(wx - self.rx, wz - self.ry) < .1: 
                 self.path_idx += 1
             else:
-                target = self.path_world[self.path_idx]  # NOT path_idx + 1
+                target = self.path_world[self.path_idx]
                 break
 
         if not target:
@@ -157,20 +177,16 @@ class Collector(Robot):
             v, w = self.dwa.get_safe_velocities(lidar_pts, (gx_r, gy_r), self.prev_cmd, self.prev_cmd)
         else:
             dist, ang = math.hypot(gx_r, gy_r), _wrap(math.atan2(gy_r, gx_r))
-            
-            # Base velocities
             v = max(-.35, min(.35, .5*dist))
-            w = max(-2.0, min(2.0, -2.5*ang))  # Increased turn rate
+            w = max(-2.0, min(2.0, -2.5*ang))
             
             # Slow down near obstacles
             if min_obs_dist < 0.1:
-                slow_factor = min_obs_dist / 0.5  # 0.0 to 1.0
-                v *= slow_factor * 0.5  # Reduce speed significantly
-                
-            # Turn in place if large angle error
-            if abs(ang) > 0.5:  # ~30 degrees
-                v *= 0.3  # Slow forward motion
-                w *= 1.5  # Increase rotation
+                v *= 0.8
+            
+            # Turn in place for large angle errors
+            if abs(ang) > 0.5:
+                v *= 0.3; w *= 1.5
 
         # Set wheel velocities
         self.prev_cmd = (v, w)
@@ -219,26 +235,37 @@ class Collector(Robot):
         if event == "auction_start": self.handle_auction_start(msg)
         elif event == "assign_task": self.handle_task_assignment(msg)
 
+    def cleanup(self):
+        """Stop logger and save to file."""
+        self.logger.stop()
+        self.logger.save()
+
     def run(self):
-        """Main robot loop: handle messages, manage FSM, navigation, and task completion."""
-        print(f"\n{'='*60}\nCollector {self.robot_id} Started\nMode: Auction-Based Task Assignment\n{'='*60}\n")
+        """Main control loop with finite state machine."""
+        print(f"\n{'='*60}\nCollector Started\nMode: Auction-Based Task Assignment\n{'='*60}\n")
         
-        while self.step(self.timestep) != -1:
-            self.update_pose()
-            self.handle_messages()
-            
-            if self.state == "IDLE":
-                self.lm.setVelocity(0); self.rm.setVelocity(0)
-                now = self.getTime()
-                if now - self.last_idle_broadcast >= 2.0:
-                    self.send_idle_status(); self.last_idle_broadcast = now
+        try:
+            while self.step(self.timestep) != -1:
+                self.update_pose()
+                self.handle_messages()
+                
+                if self.state == "IDLE":
+                    # Stop and broadcast availability
+                    self.lm.setVelocity(0); self.rm.setVelocity(0)
+                    now = self.getTime()
+                    if now - self.last_idle_broadcast >= 2.0:
+                        self.send_idle_status(); self.last_idle_broadcast = now
 
-            elif self.state == "NAVIGATING":
-                if not self.update_navigation():
-                    print(f"[{self.robot_id}] Task {self.current_task_id} COMPLETE")
-                    self.comm.send({"event": "collected", "collector_id": self.robot_id, "task_id": self.current_task_id})
-                    self.current_task_id, self.path_world, self.state = None, [], "IDLE"
-
+                elif self.state == "NAVIGATING":
+                    # Execute navigation
+                    if not self.update_navigation():
+                        print(f"Task {self.current_task_id} COMPLETE")
+                        self.comm.send({"event": "collected", "collector_id": self.robot_id, "task_id": self.current_task_id})
+                        self.current_task_id, self.path_world, self.state = None, [], "IDLE"
+        
+        finally:
+            # Always save logs on exit
+            self.cleanup()
 
 if __name__ == "__main__":
     Collector().run()
