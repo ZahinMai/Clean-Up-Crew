@@ -103,18 +103,14 @@ class OccupancyGrid:
         return new_grid
 
 
-def get_map(verbose=True) -> OccupancyGrid:
+def get_map(verbose=False) -> OccupancyGrid:
     return OccupancyGrid.from_string(CAFETERIA_MAP, DEFAULT_CELL_SIZE, ORIGIN)
 
 
-def visualise_robot_on_map(grid: OccupancyGrid, rx: float, rz: float, yaw: float, path=None):
-    # r_bot is Y-index (Row), c_bot is X-index (Col)
+def visualise_robot_on_map(grid: OccupancyGrid, rx: float, rz: float, yaw: float, robot_id=None, path=None):
     r_bot, c_bot = grid.world_to_grid(rx, rz)
     path_set = set(path) if path else set()
 
-    # --- STANDARD VISUALIZATION ---
-    # Yaw 0 = Right (+X)
-    # Yaw 90 = Up (+Y)
     sector = int((yaw + math.pi/8) / (math.pi/4)) % 8
     arrows = ['→', '↗', '↑', '↖', '←', '↙', '↓', '↘']
     arrow = arrows[sector]
@@ -122,7 +118,7 @@ def visualise_robot_on_map(grid: OccupancyGrid, rx: float, rz: float, yaw: float
     print(f"\nMap: Robot ({r_bot}, {c_bot}) {arrow} | World ({rx:.2f}, {rz:.2f})")
     
     # View Window (Centered on Robot)
-    RADIUS_R, RADIUS_C = 8, 12
+    RADIUS_R, RADIUS_C = 5, 8
     r_start = max(0, r_bot - RADIUS_R)
     r_end = min(grid.height, r_bot + RADIUS_R + 1)
     c_start = max(0, c_bot - RADIUS_C)
@@ -141,7 +137,4 @@ def visualise_robot_on_map(grid: OccupancyGrid, rx: float, rz: float, yaw: float
             else:
                 line.append('.')
         print(f"{r:02d} {''.join(line)}")
-
-def debug_position(grid, robot_id, rx, ry, yaw):
-    grid_pos = grid.world_to_grid(rx, ry)
-    print(f"[DEBUG] {robot_id} GPS:({rx:.2f}, {ry:.2f}) Yaw:{yaw:.2f} -> Grid:{grid_pos}")
+ 

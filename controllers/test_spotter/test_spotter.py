@@ -35,7 +35,7 @@ class SpotterTester(Robot):
         
         # Test locations
         self.test_locations = [
-            (-4, -5, "Table 1"),
+            (-4, 3, "Table 1"),
             (0.0, 0.0, "Center"),
             (2.5, 3.5, "Table 8"),
             (-2.5, 3.5, "Table 6"),
