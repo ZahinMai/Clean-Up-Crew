@@ -2,11 +2,39 @@
 #  temporary task dispatch -> AUTHOR: ZAHIN     #
 # ============================================= #
 from controller import Robot, Keyboard
-import json
+import json, sys, datetime, os
+
+class DualLogger:
+    def __init__(self):
+        self.terminal = sys.stdout
+        self.log = []
+
+    def write(self, message):
+        self.terminal.write(message)  # Print to console
+        self.log.append(message)      # Save to memory
+
+    def flush(self):
+        self.terminal.flush()
+
+    def save_to_file(self):
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"report_{timestamp}.md"
+        save_directory = "logs"
+        # Ensure the directory exists
+        os.makedirs(save_directory, exist_ok=True)
+        full_path = os.path.join(save_directory, filename)
+    
+        with open(filename, "w", encoding='utf-8') as f:
+            f.write("".join(self.log))
+        print(f"File saved successfully to: {full_path}")
 
 class SpotterTester(Robot):
-    def __init__(self):
+    def __init__(self):        
         super().__init__()
+
+        self.logger = DualLogger()
+        sys.stdout = self.logger
+
         self.timestep = int(self.getBasicTimeStep())
         self.robot_id = self.getName()
         
@@ -35,13 +63,24 @@ class SpotterTester(Robot):
         
         # Test locations
         self.test_locations = [
-            (-4, 3, "Table 1"),
-            (0.0, 0.0, "Center"),
-            (2.5, 3.5, "Table 8"),
-            (-2.5, 3.5, "Table 6"),
-            (1.5, 2.0, "Near Start"),
+            # --- TEST GROUP 1: BASIC COMMS & PICKUP ---
+            # Easy target near start to verify bidding works & bot stops exactly at target.
+            (1.5, 2.0, "1. Sanity Check (Near)"),
+
+            # --- TEST GROUP 2: NAVIGATION & A* ---
+            # Target behind obstacles (Tables) to verify A* finds path around static furniture, not through it.
+            (-4.0, 3.0, "2. Navigation (Behind Tables)"),
+
+            # --- TEST GROUP 3: DYNAMIC OBSTACLE AVOIDANCE ---
+            # Target across center (where humans usually walk). Watch for pausing/re-routing.
+            (2.5, -2.5, "3. Human Avoidance Zone"),
+
+            # --- TEST GROUP 4: BIDDING COMPETITION ---
+            # 2 tasks in rapid succession (handled by loop timing).
+            # Ensure closest bot wins #4, and a DIFFERENT bot wins #5.
+            (-2.5, 3.5, "4. Multi-Agent Task A"), 
+            (2.5, 3.5,  "5. Multi-Agent Task B"), 
         ]
-        
         self.print_header()
 
     def print_header(self):
@@ -68,30 +107,30 @@ class SpotterTester(Robot):
         return messages
 
     def process_idle(self, msg):
-        spotter_id = msg.get("collector_id")
+        collector_id = msg.get("collector_id")
         pos = msg.get("pos")
-        if spotter_id and pos:
-            if spotter_id in self.spotters_busy:
-                self.spotters_busy.remove(spotter_id)
-            self.spotters_idle[spotter_id] = tuple(pos)
-            print(f"  ✓ {spotter_id} IDLE at ({pos[0]:.2f}, {pos[1]:.2f})")
+        if collector_id and pos:
+            if collector_id in self.spotters_busy:
+                self.spotters_busy.remove(collector_id)
+            self.spotters_idle[collector_id] = tuple(pos)
+            print(f"  ✓ {collector_id} IDLE at ({pos[0]:.2f}, {pos[1]:.2f})")
 
     def process_bid(self, msg):
-        spotter_id = msg.get("collector_id")
+        collector_id = msg.get("collector_id")
         task_id = msg.get("task_id")
         cost = msg.get("cost")
         if task_id is not None:
             if task_id not in self.bids_received:
                 self.bids_received[task_id] = []
-            self.bids_received[task_id].append((spotter_id, cost))
-            print(f"   -> BID {spotter_id}: {cost:.2f} for task {task_id}")
+            self.bids_received[task_id].append((collector_id, cost))
+            print(f"   -> BID {collector_id}: {cost:.2f} for task {task_id}")
 
     def process_complete(self, msg):
-        spotter_id = msg.get("collector_id")
-        print(f"  ✅ {spotter_id} COMPLETED task")
+        collector_id = msg.get("collector_id")
+        print(f"{collector_id} COMPLETED task")
         self.tasks_completed += 1
-        if spotter_id in self.spotters_busy:
-            self.spotters_busy.remove(spotter_id)
+        if collector_id in self.spotters_busy:
+            self.spotters_busy.remove(collector_id)
 
     def start_auction(self, idx=None):
         if idx is None:
@@ -201,6 +240,9 @@ class SpotterTester(Robot):
             print("TEST COMPLETE")
             print(f"Auctions: {self.current_task_id}, Completed: {self.tasks_completed}")
             print("="*70 + "\n")
+            
+            self.logger.save_to_file()
+             
             self.test_phase = 100
 
     def run(self):
@@ -219,7 +261,6 @@ class SpotterTester(Robot):
                 self.handle_keyboard()
             else:
                 self.run_auto()
-
 
 if __name__ == "__main__":
     tester = SpotterTester()
