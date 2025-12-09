@@ -17,7 +17,7 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
 from lib_shared import vision
-from spotter_coverage import CoveragePlanner
+from lib_shared.coverage import CoveragePlanner
 from lib_shared.communication import Communication
 from lib_shared.global_planner import AStarPlanner
 from lib_shared.local_planner import DWA
