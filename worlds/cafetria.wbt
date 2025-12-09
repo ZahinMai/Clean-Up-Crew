@@ -22,8 +22,8 @@ WorldInfo {
   title "cafeteria"
 }
 Viewpoint {
-  orientation 0.6405536949397115 -0.5312340732829333 -0.5545099848355358 4.003659288283562
-  position -3.482565916051165 2.823980395323386 36.11316750999303
+  orientation 0.7068175329116662 -0.04547532563974029 -0.705932695040133 3.2323630635842164
+  position -0.5009978283476783 -0.5463615742118406 20.216628720011826
 }
 TexturedBackground {
   texture "entrance_hall"
@@ -450,13 +450,9 @@ TurtleBot3Burger {
   ]
 }
 E-puck {
-  hidden position_0_0 -3.085880747248035e-08
-  hidden position_0_1 1.5487383639674565e-07
-  hidden rotation_1 0 -1 0 2.9802322387695313e-08
-  hidden rotation_2 0 1 0 1.5485740967710712e-07
-  translation -1.9999999999999996 -5.000000000000001 -6.396199560286878e-05
-  rotation 0.1749520445704636 0.12374811876254059 0.9767692589364936 1.4017554061570958e-08
-  controller "test_spotter_comm"
+  translation -1.999999999903293 -5.000000000000003 -6.396199560779713e-05
+  rotation 0.17427577986283666 -0.12756983305239086 0.9763984280242289 1.4022851932171952e-08
+  controller "spotter"
   window "<none>"
   turretSlot [
     Compass {
@@ -468,4 +464,14 @@ E-puck {
       enablePhysics FALSE
     }
   ]
+}
+Robot {
+  children [
+    Receiver {
+      channel 1
+    }
+  ]
+  name "SUPERVISOR"
+  controller "supervisor"
+  supervisor TRUE
 }

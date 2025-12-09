@@ -42,7 +42,7 @@ class CoveragePlanner:
                 previous_point = final_waypoints[-1]
                 chosen_corner = self._get_closest_corner(zone, previous_point)
             
-            zone_path = self._generate_zone_zigzag(zone, chosen_corner)
+            zone_path = self._generate_zone_lawnmower(zone, chosen_corner)
             final_waypoints.extend(zone_path)
 
         print(f"Mission: {len(final_waypoints)} points.")
@@ -167,7 +167,7 @@ class CoveragePlanner:
                 
         return best_key
 
-    def _generate_zone_zigzag(self, zone, start_key):
+    def _generate_zone_lawnmower(self, zone, start_key):
         """Generates waypoints for a given zone starting from a specified corner."""
         waypoints = []
         r_min, r_max = zone['r_min'], zone['r_max']

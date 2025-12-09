@@ -1,4 +1,5 @@
 # Cafeteria Clean-Up-Crew: Auction-Based Multi-Robot Coordination
+<<<<<<< HEAD
 **A Webots simulation framework implementing a "Spotter-Collector" architecture for efficient automated cleaning.**
 
 ## Overview
@@ -12,6 +13,24 @@ This project simulates a cafeteria environment where a coordinated team of robot
 3.  **The Supervisor:** Manages the simulation state, spawns trash objects (blue spheres), and tracks successful collections.
 4.  **Human Agent:** A dynamic obstacle that moves between waypoints to test robot avoidance capabilities.
 
+=======
+
+**A Webots simulation framework implementing a "Spotter-Collector" architecture for efficient automated cleaning.**
+
+  
+
+## Overview
+
+This project simulates a cafeteria environment where a coordinated team of robots identifies and removes trash. Unlike brute-force swarm approaches, this system utilizes **role specialization** and an **auction-based task allocation** protocol to minimize redundant travel and maximize efficiency.
+
+### The Team
+
+1.  **The Spotter (e-puck):** A sensor-rich robot that patrols the environment using a coverage algorithm. It detects trash using computer vision and "auctions" the cleaning task to the fleet.
+2.  **The Collectors (TurtleBot3 Burger):** "Blind" worker robots that bid on tasks based on their distance and current state. The winner navigates to the target using global and local planners.
+3.  **The Supervisor:** Manages the simulation state, spawns trash objects (blue spheres), and tracks successful collections.
+4.  **Human Agent:** A dynamic obstacle that moves between waypoints to test robot avoidance capabilities.
+
+>>>>>>> ed362da5327b2fd645cb4eac39c2ba1fff1a2ee1
 -----
 
 ## System Architecture
@@ -123,4 +142,8 @@ Clean-Up-Crew/
 
 ## License
 
+<<<<<<< HEAD
 This project is licensed under the **MIT License**. See [LICENSE](https://www.google.com/search?q=LICENSE) for details.
+=======
+This project is licensed under the **MIT License**. See [LICENSE](https://www.google.com/search?q=LICENSE) for details.
+>>>>>>> ed362da5327b2fd645cb4eac39c2ba1fff1a2ee1
