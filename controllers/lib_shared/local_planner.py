@@ -120,6 +120,11 @@ class DWA:
         else:
             g_th = 0.0
 
+        filtered_obs: List[Tuple[float, float]] = []
+        for ox, oy in lidar_points:
+            if ox > -0.02:
+                filtered_obs.append((ox, oy))
+
         best_v = 0.0
         best_w = 0.0
         best_score = -1e9
@@ -127,7 +132,7 @@ class DWA:
         for v, w in samples:
             traj = self.rollout(v, w)
             pts = [(x, y) for x, y, _ in traj]
-            d_raw = self._min_clear(pts, lidar_points)
+            d_raw = self._min_clear(pts, filtered_obs)
             eff_clear = max(0.0, d_raw - (p["RADIUS"] + 0.02))
             if eff_clear < p["SAFE"]:
                 continue
@@ -155,9 +160,9 @@ class DWA:
                 best_w = w
 
         if best_score < -1e8:
-            if lidar_points:
+            if filtered_obs:
                 bias = 0.0
-                for ox, oy in lidar_points:
+                for ox, oy in filtered_obs:
                     if ox > 0.05:
                         bias += oy
                 if bias > 0.0:
