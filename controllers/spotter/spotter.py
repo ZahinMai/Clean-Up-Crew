@@ -20,7 +20,7 @@ from lib_shared import vision
 from spotter_coverage import CoveragePlanner
 from lib_shared.communication import Communication
 from lib_shared.global_planner import AStarPlanner
-from lib_shared.local_planner import DWA
+from lib_shared.local_planner import DWA, _wrap
 from lib_shared.map_module import get_map
 
 
@@ -221,7 +221,12 @@ class SpotterController:
 
             # Control and Navigation
             gx, gy = self.world_to_robot(rx, ry, yaw, *target)
-            v_dwa, w_dwa = self.dwa.get_safe_velocities(obstacles, (gx, gy), prev_cmd=self.prev_cmd)
+
+            # v_dwa, w_dwa = self.dwa.get_safe_velocities(obstacles, (gx, gy), prev_cmd=self.prev_cmd)
+            dist = math.hypot(gx, gy)
+            ang = _wrap(math.atan2(gy, gx))
+            v_dwa = max(-.35, min(.35, .5*dist))
+            w_dwa = max(-2.0, min(2.0, -1.5*ang))
             
             v = self.config.SMOOTHING_FACTOR * self.prev_cmd[0] + (1.0 - self.config.SMOOTHING_FACTOR) * v_dwa
             w = self.config.SMOOTHING_FACTOR * self.prev_cmd[1] + (1.0 - self.config.SMOOTHING_FACTOR) * w_dwa

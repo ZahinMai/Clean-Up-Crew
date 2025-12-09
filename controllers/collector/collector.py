@@ -34,6 +34,8 @@ DWA_CONFIG = {
     'GAMMA': 0.1, 'DELTA': 0.1, 'EPS': 0.1, 'LIDAR_SKIP': 5,
 }
 
+CHANNEL = 1
+
 def get_lidar_points(lidar, max_r=3.5, min_r=0.1):
     """Return filtered (x, y) lidar points in robot frame."""
     if not lidar: return []
@@ -64,7 +66,7 @@ class Collector(Robot):
         self.logger.start()
         
         # Communication
-        self.comm = Communication(self, channel=1)
+        self.comm = Communication(self, CHANNEL)
 
         # ------ Sensor & Actuator Setup ------ #
         self.gps = self.getDevice('gps'); self.gps.enable(self.timestep)
@@ -258,7 +260,13 @@ class Collector(Robot):
                     # Execute navigation
                     if not self.update_navigation():
                         print(f"Task {self.current_task_id} COMPLETE")
-                        self.comm.send({"event": "collected", "collector_id": self.robot_id, "task_id": self.current_task_id})
+                        self.comm.send({
+                            "event": "collected", 
+                            "collector_id": self.robot_id, 
+                            "task_id": self.current_task_id,
+                            "x": self.rx,
+                            "y": self.ry
+                        })
                         self.current_task_id, self.path_world, self.state = None, [], "IDLE"
         
         finally: self.logger.stop()
