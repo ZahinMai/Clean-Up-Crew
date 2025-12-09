@@ -10,15 +10,24 @@ if CTRL_DIR not in sys.path:
 
 from lib_shared.local_planner import DWA
 
-LEFT_MOTOR = "left wheel motor"
-RIGHT_MOTOR = "right wheel motor"
+LEFT = "left wheel motor"
+RIGHT = "right wheel motor"
+R = 0.033
+L = 0.160
+
 LIDAR_NAME = "LDS-01"
 IMU_NAME = "inertial unit"
 COMPASS_NAME = "compass"
 GPS_NAME = "gps"
 
-WHEEL_RADIUS = 0.033
-AXLE_LENGTH = 0.160
+WAYPOINTS = [
+    (1.40, 0.20),
+    (1.40, 1.10),
+    (0.10, 1.10),
+    (-1.00, 1.10),
+    (-1.00, 0.20),
+    (0.10, 0.20),
+]
 
 
 def dev(robot, name):
@@ -29,12 +38,31 @@ def dev(robot, name):
 
 
 def yaw_from(imu, compass):
-    if imu:
-        _, _, y = imu.getRollPitchYaw()
-        return y
+    """
+    Return yaw (heading) in radians.
+    Prefer the compass (more stable for planar robots),
+    fall back to IMU if no compass is available.
+    """
+    # Prefer compass: vector points towards north; yaw=0 along +x
     if compass:
-        n = compass.getValues()
-        return math.atan2(n[0], n[2])
+        try:
+            n = compass.getValues()  # [x, y, z]
+            # Use same convention as your other controllers: atan2(x, z)
+            return math.atan2(n[0], n[2])
+        except Exception:
+            pass
+
+    # Fallback: inertial unit roll/pitch/yaw
+    if imu:
+        try:
+            roll, pitch, yaw = imu.getRollPitchYaw()
+            # Sometimes yaw can be NaN or inf during start-up
+            if math.isfinite(yaw):
+                return yaw
+        except Exception:
+            pass
+
+    # Last resort
     return 0.0
 
 
@@ -48,8 +76,8 @@ def main():
     robot = Robot()
     ts = int(robot.getBasicTimeStep())
 
-    lm = dev(robot, LEFT_MOTOR)
-    rm = dev(robot, RIGHT_MOTOR)
+    lm = dev(robot, LEFT)
+    rm = dev(robot, RIGHT)
     lm.setPosition(float("inf"))
     rm.setPosition(float("inf"))
     lm.setVelocity(0.0)
@@ -81,14 +109,7 @@ def main():
         }
     )
 
-    waypoints = [
-        (0.90, 0.00),
-        (0.90, 0.90),
-        (-0.80, 0.90),
-        (-0.80, 0.00),
-    ]
-    wp_idx = 0
-
+    idx = 0
     prev = (0.0, 0.0)
     smooth = 0.15
 
@@ -108,11 +129,11 @@ def main():
         x, _, z = gps.getValues()
         yaw = yaw_from(imu, compass)
 
-        tx, tz = waypoints[wp_idx]
+        tx, tz = WAYPOINTS[idx]
         dx = tx - x
         dz = tz - z
         if math.hypot(dx, dz) < 0.22:
-            wp_idx = (wp_idx + 1) % len(waypoints)
+            idx = (idx + 1) % len(WAYPOINTS)
             continue
 
         ranges = lidar.getRangeImage()
@@ -152,37 +173,20 @@ def main():
 
         max_v = 0.26
         max_w = 1.4
-        if v > max_v:
-            v = max_v
-        if v < -max_v:
-            v = -max_v
-        if w > max_w:
-            w = max_w
-        if w < -max_w:
-            w = -max_w
+        v = max(-max_v, min(max_v, v))
+        w = max(-max_w, min(max_w, w))
 
         prev = (v, w)
 
-        wl = (v - 0.5 * w * AXLE_LENGTH) / WHEEL_RADIUS
-        wr = (v + 0.5 * w * AXLE_LENGTH) / WHEEL_RADIUS
+        wl = (v - 0.5 * w * L) / R
+        wr = (v + 0.5 * w * L) / R
 
         max_wheel = min(lm.getMaxVelocity(), rm.getMaxVelocity())
-        if wl > max_wheel:
-            wl = max_wheel
-        if wl < -max_wheel:
-            wl = -max_wheel
-        if wr > max_wheel:
-            wr = max_wheel
-        if wr < -max_wheel:
-            wr = -max_wheel
+        wl = max(-max_wheel, min(max_wheel, wl))
+        wr = max(-max_wheel, min(max_wheel, wr))
 
         lm.setVelocity(wl)
         rm.setVelocity(wr)
-
-        if int(now * 2.0) % 4 == 0:
-            print(
-                f"[collector] wp={wp_idx} v={v:.2f} w={w:.2f} wl={wl:.2f} wr={wr:.2f} obs={len(pts)}"
-            )
 
 
 if __name__ == "__main__":
