@@ -1,75 +1,129 @@
-# Multi-Robot Coordination: Scaling vs. Specialisation
+# Cafeteria Clean-Up-Crew: Auction-Based Multi-Robot Coordination
 
-**A Webots simulation benchmarking the efficiency of independent swarms versus coordinated teams.**
+**A Webots simulation framework implementing a "Spotter-Collector" architecture for efficient automated cleaning.**
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue) ![Webots](https://img.shields.io/badge/Webots-R2025a-red) ![Status](https://img.shields.io/badge/Status-Active-success)
+  
 
-## "Too Many Cooks" (or "Too Many Cleaners")
-In theory, adding more robots should improve task performance. In practice, robots can waste effort through path overlap, item contention, and collisions. Coordination promises efficiency, but also introduces overhead. One study shows how cleaning success rises by only about 6.8% when moving from a single-robot baseline to a two-robot team (Patil, Banavar and Narayanan, 2023).
+## Overview
 
-As the tipping point between benefit and overhead is context-dependent, we created a structured, sandboxed way to test it. This simple webots simulation provides a reproducible framework to compare **brute-force scaling** against **role specialisation** in a cafeteria cleaning task.
+This project simulates a cafeteria environment where a coordinated team of robots identifies and removes trash. Unlike brute-force swarm approaches, this system utilizes **role specialization** and an **auction-based task allocation** protocol to minimize redundant travel and maximize efficiency.
 
----
+### The Team
 
-## The Experiment
-We simulate a cafeteria environment with scattered rubbish (red/green objects) and static obstacles. We compare three distinct configurations under identical conditions:
+1.  **The Spotter (e-puck):** A sensor-rich robot that patrols the environment using a coverage algorithm. It detects trash using computer vision and "auctions" the cleaning task to the fleet.
+2.  **The Collectors (TurtleBot3 Burger):** "Blind" worker robots that bid on tasks based on their distance and current state. The winner navigates to the target using global and local planners.
+3.  **The Supervisor:** Manages the simulation state, spawns trash objects (blue spheres), and tracks successful collections.
+4.  **Human Agent:** A dynamic obstacle that moves between waypoints to test robot avoidance capabilities.
 
-| Setup | Architecture | Description |
-| :--- | :--- | :--- |
-| **Baseline** | Single Agent | One general-purpose robot scanning and cleaning alone. |
-| **Swarm** | Independent | Three general-purpose robots working simultaneously but **without communication**. |
-| **Coordinated** | **Spotter-Collector** | One static "Spotter" (high vantage) directing two mobile "Collectors" via comms. |
-
----
+-----
 
 ## System Architecture
 
-### Overview
-![alt text](lta_logic.png)
+The project is built on a modular architecture separating high-level logic from low-level control.
 
-### Components
-![alt text](lta_components.png)
+### 1\. Communication & Task Allocation
 
-### Logic
-![alt text](lta_sequence.png)
+Implemented in `lib_shared/communication.py`.
 
+  * **Protocol:** JSON-based messaging via Webots Emitter/Receiver nodes.
+  * **Auction Process:**
+    1.  **Discovery:** Spotter detects trash and broadcasts an `auction_start` event with coordinates.
+    2.  **Bidding:** Idle Collectors calculate the A\* path cost to the target and reply with a `bid`.
+    3.  **Assignment:** The Spotter (or testing agent) assigns the task to the lowest bidder.
+    4.  **Execution:** The winning Collector transitions to `NAVIGATING` state.
 
-### 1. The Controller Stack
-Each robot operates on a layered architecture:
-* **Perception Layer:** Handles camera input (rubbish detection) and LIDAR/Distance sensors (obstacle detection).
-* **Decision Layer:**
-    * *Independent Mode:* Random walk or heuristic search until a target is visually confirmed.
-    * *Collector Mode:* Listens for coordinates from the `Spotter`, queues targets, and executes path planning.
-* **Action Layer:** Translates target vectors into motor velocities (differential drive).
+### 2\. Navigation Stack
 
-### 2. Communication Protocol (Setup 3)
-The Coordinated setup utilises the Webots `Emitter` and `Receiver` nodes to simulate a local area network.
-* **The Spotter:** Uses a ceiling-mounted camera to segment the arena. When rubbish is detected, it broadcasts a packet: `{ID, Coordinates(x,y), Priority}`.
-* **The Collectors:** operate as "blind" workers. They do not scan for trash; they simply execute the navigation stack based on received coordinates, reducing redundant path overlap.
+  * **Global Planner (`AStarPlanner`):**
+      * Uses an Occupancy Grid (`map_module.py`) to represent the cafeteria.
+      * Calculates the optimal path using A\* with Euclidean distance heuristics.
+      * Includes path smoothing to remove unnecessary waypoints.
+  * **Local Planner (`DWA`):**
+      * Implements the **Dynamic Window Approach** to avoid dynamic obstacles (like the Human Agent) while tracking the global path.
+      * Calculates safe linear and angular velocities based on LiDAR point clouds.
 
----
+### 3\. Perception
 
-## Key Hypotheses
-This framework allows us to validate the following theories:
-1.  **Scaling Saturation:** Independent robots (Setup 2) will reduce total time compared to Baseline, but with significant efficiency loss due to path overlap.
-2.  **Coordination Advantage:** The Spotter-Collector team (Setup 3) will achieve the fastest completion time by eliminating search redundancy.
-3.  **Efficiency Delta:** Coordinated robots will travel less total distance per item collected than independent swarms.
+  * **Vision (`vision.py`):**
+      * Uses a DFS (Depth-First Search) flood-fill algorithm on camera images to cluster pixels.
+      * Identifies objects based on RGB thresholds (specifically filtering for blue "trash" objects).
+  * **Coverage (`coverage.py`):**
+      * Decomposes the map into rectangular zones.
+      * Generates "lawnmower" patterns to ensure the Spotter visually covers the entire accessible floor area.
 
-## Getting Started
+-----
 
-1.  **Clone the repo**
+## Installation & Usage
+
+### Prerequisites
+
+  * **Webots R2025a** (or compatible version)
+  * **Python 3.8+** (Standard libraries used: `math`, `json`, `heapq`, `collections`)
+
+### Running the Simulation
+
+1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/ZahinMai/Clean-Up-Crew.git](https://github.com/ZahinMai/Clean-Up-Crew.git)
+    git clone https://github.com/ZahinMai/Clean-Up-Crew.git
     ```
-2.  **Launch Webots**
-    Open `worlds/cafeteria_cleaning.wbt`.
-3.  **Select Controller**
-    Edit the robot `controller` field to switch between `independent_controller.py` and `coordinated_controller.py`.
+2.  **Launch Webots:**
+    Open the world file: `worlds/cafetria.wbt`.
+3.  **Start the Simulation:**
+    Press the **Play** button in the Webots interface.
+      * The **Supervisor** will spawn 10 blue trash objects.
+      * The **Spotter** will begin its patrol pattern.
+      * **Collectors** will idle until receiving tasks.
 
----
+### Running Automated Tests
 
-## Contribution
-This repository serves as a prrof-of-concept **benchmarking tool** for multi-robot studies. It allows us to:
-* Visually prove the efficiency of specialised roles.
-* Quantify the "coordination overhead" (latency/complexity) vs. the "interference cost" (collisions/overlap).
-* Test custom path-planning algorithms within a pre-built coordination framework.
+To verify the auction logic and navigation without waiting for the full simulation loop:
+
+1.  Select the **Spotter** robot in the Webots scene tree.
+2.  Change the `controller` field from `spotter` to `test_spotter_comm`.
+3.  Save and Reload.
+4.  The system will run through 5 scenarios (Sanity Check, Static Nav, Dynamic Avoidance, Multi-Agent Competition).
+5.  Results are logged to the console and `logs/` directory.
+
+-----
+
+## File Structure
+
+```text
+Clean-Up-Crew/
+├── controllers/
+│   ├── collector/              # Logic for worker robots
+│   │   ├── collector.py        # Main FSM (IDLE <-> NAVIGATING)
+│   │   └── logs/               # Execution reports
+│   ├── spotter/                # Logic for the sensing robot
+│   │   └── spotter.py          # Vision and Coverage integration
+│   ├── supervisor/             # Game master logic
+│   │   └── supervisor.py       # Spawns trash, tracks score
+│   ├── Human_agent/            # Dynamic obstacle logic
+│   ├── test_spotter_comm/      # Unit testing for auctions
+│   └── lib_shared/             # CORE LIBRARIES
+│       ├── communication.py    # JSON messaging wrapper
+│       ├── coverage.py         # Zone decomposition planner
+│       ├── global_planner.py   # A* implementation
+│       ├── local_planner.py    # DWA implementation
+│       ├── map_module.py       # Grid representation
+│       ├── dual_logger.py      # Logging utility
+│       └── vision.py           # Pixel processing
+└── worlds/
+    ├── cafetria.wbt            # Main simulation environment
+    └── .cafetria.wbproj        # Project configuration
+```
+
+-----
+
+## Contributors
+
+  * **Zahin Maisa:** Architecture, Global Navigation (A\*), Testing Framework.
+  * **Abdullateef Vahora:** Spotter Logic, Computer Vision, Coverage Planning.
+  * **Ajinkya:** Local Path Planning (DWA).
+  * **Kunal:** Communication Protocol.
+
+-----
+
+## License
+
+This project is licensed under the **MIT License**. See [LICENSE](https://www.google.com/search?q=LICENSE) for details.
