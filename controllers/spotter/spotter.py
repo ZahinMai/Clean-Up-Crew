@@ -16,7 +16,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-from lib_shared import vision
+from lib_shared.vision import vision
 from lib_shared.coverage import CoveragePlanner
 from lib_shared.communication import Communication
 from lib_shared.global_planner import AStarPlanner

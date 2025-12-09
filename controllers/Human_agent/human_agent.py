@@ -38,12 +38,31 @@ def dev(robot, name):
 
 
 def yaw_from(imu, compass):
-    if imu:
-        _, _, y = imu.getRollPitchYaw()
-        return y
+    """
+    Return yaw (heading) in radians.
+    Prefer the compass (more stable for planar robots),
+    fall back to IMU if no compass is available.
+    """
+    # Prefer compass: vector points towards north; yaw=0 along +x
     if compass:
-        n = compass.getValues()
-        return math.atan2(n[0], n[2])
+        try:
+            n = compass.getValues()  # [x, y, z]
+            # Use same convention as your other controllers: atan2(x, z)
+            return math.atan2(n[0], n[2])
+        except Exception:
+            pass
+
+    # Fallback: inertial unit roll/pitch/yaw
+    if imu:
+        try:
+            roll, pitch, yaw = imu.getRollPitchYaw()
+            # Sometimes yaw can be NaN or inf during start-up
+            if math.isfinite(yaw):
+                return yaw
+        except Exception:
+            pass
+
+    # Last resort
     return 0.0
 
 
@@ -154,14 +173,8 @@ def main():
 
         max_v = 0.26
         max_w = 1.4
-        if v > max_v:
-            v = max_v
-        if v < -max_v:
-            v = -max_v
-        if w > max_w:
-            w = max_w
-        if w < -max_w:
-            w = -max_w
+        v = max(-max_v, min(max_v, v))
+        w = max(-max_w, min(max_w, w))
 
         prev = (v, w)
 
@@ -169,14 +182,8 @@ def main():
         wr = (v + 0.5 * w * L) / R
 
         max_wheel = min(lm.getMaxVelocity(), rm.getMaxVelocity())
-        if wl > max_wheel:
-            wl = max_wheel
-        if wl < -max_wheel:
-            wl = -max_wheel
-        if wr > max_wheel:
-            wr = max_wheel
-        if wr < -max_wheel:
-            wr = -max_wheel
+        wl = max(-max_wheel, min(max_wheel, wl))
+        wr = max(-max_wheel, min(max_wheel, wr))
 
         lm.setVelocity(wl)
         rm.setVelocity(wr)
