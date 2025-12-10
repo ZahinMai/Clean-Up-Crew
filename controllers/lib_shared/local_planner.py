@@ -1,180 +1,172 @@
 # ============================================= #
-#  DWA OBSTACLE AVOIDANCE  -> AUTHOR: AJINKYA   #
+#  SIMPLE OBSTACLE AVOIDANCE -> AUTHOR: ZAHIN  #
 # ============================================= #
-from __future__ import annotations
+# Simple reactive obstacle avoidance that dodges
+# oncoming obstacles while following A* path
+# ============================================= #
+
 import math
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
-DEFAULTS: Dict[str, float] = {
-    "DT_CTRL": 0.08,
-    "T_PRED": 2.0,
-    "DT_SIM": 0.08,
-    "NV": 7,
-    "NW": 15,
-    "V_MAX": 0.30,
-    "W_MAX": 2.5,
-    "A_V": 1.5,
-    "A_W": 3.5,
-    "RADIUS": 0.18,
-    "SAFE": 0.06,
-    "CLEAR_N": 0.5,
-    "ALPHA": 0.18,
-    "BETA": 0.34,
-    "GAMMA": 0.18,
-    "DELTA": 0.45,
-    "EPS": 0.05,
-    "D_NORM": 2.0,
-}
-
-def _clip(x: float, lo: float, hi: float) -> float:
-    if x < lo:
-        return lo
-    if x > hi:
-        return hi
-    return x
+def _wrap(angle: float) -> float:
+    """Wrap angle to [-pi, pi]."""
+    while angle > math.pi:
+        angle -= 2 * math.pi
+    while angle < -math.pi:
+        angle += 2 * math.pi
+    return angle
 
 
-def _wrap(a: float) -> float:
-    while a > math.pi:
-        a -= 2.0 * math.pi
-    while a <= -math.pi:
-        a += 2.0 * math.pi
-    return a
+class SimpleAvoidance:
+    """Simple reactive obstacle avoidance for path following."""
+    def __init__(self):
+        self.DANGER_DIST = 0.25      # Distance to start avoiding (m)
+        self.CRITICAL_DIST = 0.15    # Distance for emergency stop (m)
+        self.SAFE_DIST = 0.4         # Distance considered safe (m)
+        self.FOV_ANGLE = math.pi / 3 # 60° forward field of view
+        self.SIDE_BIAS = 1.2         # Prefer turning right (positive = right)
+        
+    def get_avoidance_velocities(
+        self,
+        lidar_pts: List[Tuple[float, float]],
+        goal_robot_frame: Tuple[float, float],
+        max_v: float = 0.35,
+        max_w: float = 2.0
+    ) -> Tuple[float, float]:
+        """
+        Simple avoidance: check front, dodge if needed, otherwise go to goal.
+        
+        Args:
+            lidar_pts: Obstacle points in robot frame (x forward, y left)
+            goal_robot_frame: Target waypoint in robot frame
+            max_v: Maximum linear velocity
+            max_w: Maximum angular velocity
+            
+        Returns:
+            (v, w): Commanded velocities
+        """
+        gx, gy = goal_robot_frame
+        goal_dist = math.hypot(gx, gy)
+        goal_angle = _wrap(math.atan2(gy, gx))
+        
+        # Check for obstacles in front
+        obstacle_info = self._check_front_obstacles(lidar_pts)
+        
+        if obstacle_info['critical']:
+            # EMERGENCY STOP - something very close
+            return 0.0, 0.0
+        
+        elif obstacle_info['danger']:
+            # AVOID - obstacle in danger zone
+            v = max_v * 0.3  # Slow down
+            
+            # Determine dodge direction based on obstacle side
+            obs_angle = obstacle_info['angle']
+            
+            if abs(obs_angle) < 0.2:  # Nearly straight ahead
+                # Choose side based on more free space or bias
+                left_clear = obstacle_info['left_clear']
+                right_clear = obstacle_info['right_clear']
+                
+                if right_clear > left_clear * self.SIDE_BIAS:
+                    w = -max_w * 0.7  # Turn right
+                else:
+                    w = max_w * 0.7   # Turn left
+            else:
+                # Obstacle on a side - turn away from it
+                w = -math.copysign(max_w * 0.8, obs_angle)
+            
+            return v, w
+        
+        else:
+            # CLEAR PATH - normal navigation to goal
+            # Proportional control to goal
+            v = max_v * min(1.0, goal_dist / 1.0)
+            w = -2.5 * goal_angle
+            
+            # Slow down for sharp turns
+            if abs(goal_angle) > 0.5:
+                v *= 0.4
+            
+            # Clamp velocities
+            v = max(-max_v, min(max_v, v))
+            w = max(-max_w, min(max_w, w))
+            
+            return v, w
+    
+    def _check_front_obstacles(
+        self, 
+        lidar_pts: List[Tuple[float, float]]
+    ) -> dict:
+        """
+        Check for obstacles in front of robot.
+        
+        Returns dict with:
+            - critical: bool (very close obstacle)
+            - danger: bool (obstacle in danger zone)
+            - distance: float (distance to nearest front obstacle)
+            - angle: float (angle to nearest obstacle)
+            - left_clear: float (clearance on left side)
+            - right_clear: float (clearance on right side)
+        """
+        if not lidar_pts:
+            return {
+                'critical': False,
+                'danger': False,
+                'distance': float('inf'),
+                'angle': 0.0,
+                'left_clear': float('inf'),
+                'right_clear': float('inf')
+            }
+        
+        min_dist = float('inf')
+        min_angle = 0.0
+        left_min = float('inf')
+        right_min = float('inf')
+        
+        for x, y in lidar_pts:
+            dist = math.hypot(x, y)
+            angle = math.atan2(y, x)
+            
+            # Only consider points in forward field of view
+            if abs(angle) < self.FOV_ANGLE and x > 0:
+                if dist < min_dist:
+                    min_dist = dist
+                    min_angle = angle
+                
+                # Track left/right clearance
+                if angle > 0:  # Left side
+                    left_min = min(left_min, dist)
+                else:  # Right side
+                    right_min = min(right_min, dist)
+        
+        return {
+            'critical': min_dist < self.CRITICAL_DIST,
+            'danger': min_dist < self.DANGER_DIST,
+            'distance': min_dist,
+            'angle': min_angle,
+            'left_clear': left_min,
+            'right_clear': right_min
+        }
+
 
 class DWA:
-    def __init__(self, params: Dict[str, float] | None = None) -> None:
-        cfg = dict(DEFAULTS)
-        if params:
-            cfg.update(params)
-        self.p = cfg
-
-    def rollout(self, v: float, w: float) -> List[Tuple[float, float, float]]:
-        dt = self.p["DT_SIM"]
-        t_max = self.p["T_PRED"]
-        x = 0.0
-        y = 0.0
-        th = 0.0
-        t = 0.0
-        traj: List[Tuple[float, float, float]] = []
-        while t < t_max:
-            x += v * math.cos(th) * dt
-            y += v * math.sin(th) * dt
-            th = _wrap(th + w * dt)
-            traj.append((x, y, th))
-            t += dt
-        return traj
-
-    @staticmethod
-    def _min_clear(
-        traj_xy: List[Tuple[float, float]],
-        obs_xy: List[Tuple[float, float]],
-    ) -> float:
-        if not obs_xy:
-            return float("inf")
-        best = float("inf")
-        for tx, ty in traj_xy:
-            for ox, oy in obs_xy:
-                d = math.hypot(ox - tx, oy - ty)
-                if d < best:
-                    best = d
-        return best
-
+    """Dummy DWA class for backward compatibility - uses SimpleAvoidance."""
+    
+    def __init__(self):
+        self.avoidance = SimpleAvoidance()
+    
     def get_safe_velocities(
         self,
-        lidar_points: List[Tuple[float, float]],
-        goal_vec: Tuple[float, float],
-        prev_cmd: Tuple[float, float] = (0.0, 0.0),
-        cur: Tuple[float, float] = (0.0, 0.0),
+        lidar_pts: List[Tuple[float, float]],
+        goal_robot_frame: Tuple[float, float],
+        current_vel: Tuple[float, float],
+        prev_cmd: Tuple[float, float]
     ) -> Tuple[float, float]:
-        p = self.p
-        v_now, w_now = cur
-
-        v_lo = _clip(v_now - p["A_V"] * p["DT_CTRL"], -p["V_MAX"], p["V_MAX"])
-        v_hi = _clip(v_now + p["A_V"] * p["DT_CTRL"], -p["V_MAX"], p["V_MAX"])
-        w_lo = _clip(w_now - p["A_W"] * p["DT_CTRL"], -p["W_MAX"], p["W_MAX"])
-        w_hi = _clip(w_now + p["A_W"] * p["DT_CTRL"], -p["W_MAX"], p["W_MAX"])
-
-        samples: List[Tuple[float, float]] = [prev_cmd]
-        if p["W_MAX"] > 0.0:
-            samples.append((0.0, 0.6 * p["W_MAX"]))
-            samples.append((0.0, -0.6 * p["W_MAX"]))
-
-        nv = max(1, int(p["NV"]))
-        nw = max(1, int(p["NW"]))
-        for i in range(nv):
-            if nv == 1:
-                v = 0.5 * (v_lo + v_hi)
-            else:
-                v = v_lo + (v_hi - v_lo) * i / (nv - 1)
-            for j in range(nw):
-                if nw == 1:
-                    w = 0.5 * (w_lo + w_hi)
-                else:
-                    w = w_lo + (w_hi - w_lo) * j / (nw - 1)
-                samples.append((v, w))
-
-        gx, gy = goal_vec
-        dist_goal = math.hypot(gx, gy)
-        if dist_goal > 1e-9:
-            g_th = math.atan2(gy, gx)
-        else:
-            g_th = 0.0
-
-        filtered_obs: List[Tuple[float, float]] = []
-        for ox, oy in lidar_points:
-            if ox > -0.02:
-                filtered_obs.append((ox, oy))
-
-        best_v = 0.0
-        best_w = 0.0
-        best_score = -1e9
-
-        for v, w in samples:
-            traj = self.rollout(v, w)
-            pts = [(x, y) for x, y, _ in traj]
-            d_raw = self._min_clear(pts, filtered_obs)
-            eff_clear = max(0.0, d_raw - (p["RADIUS"] + 0.02))
-            if eff_clear < p["SAFE"]:
-                continue
-
-            x_e, y_e, th_e = traj[-1]
-            heading = 1.0 - abs(_wrap(th_e - g_th)) / math.pi
-            prog = 1.0 - min(math.hypot(gx - x_e, gy - y_e) / p["D_NORM"], 1.0)
-            speed_term = max(0.0, v) / (p["V_MAX"] if p["V_MAX"] > 0 else 1.0)
-            clear_term = min(eff_clear / p["CLEAR_N"], 1.0)
-            smooth = math.exp(
-                -math.hypot(v - prev_cmd[0], w - prev_cmd[1]) / 0.2
-            )
-
-            score = (
-                p["ALPHA"] * heading
-                + p["BETA"] * prog
-                + p["GAMMA"] * clear_term
-                + p["DELTA"] * speed_term
-                + p["EPS"] * smooth
-            )
-
-            if score > best_score:
-                best_score = score
-                best_v = v
-                best_w = w
-
-        if best_score < -1e8:
-            if filtered_obs:
-                bias = 0.0
-                for ox, oy in filtered_obs:
-                    if ox > 0.05:
-                        bias += oy
-                if bias > 0.0:
-                    return 0.0, -0.9
-                if bias < 0.0:
-                    return 0.0, 0.9
-            if abs(g_th) > math.pi / 6.0:
-                return 0.0, 0.8 * math.copysign(1.0, g_th)
-            return 0.14, 0.0
-
-        if best_v > 0.0 and dist_goal > 0.30:
-            if best_v < 0.16:
-                best_v = 0.16
-
-        return best_v, best_w
+        """Wrapper to maintain compatibility with existing code."""
+        return self.avoidance.get_avoidance_velocities(
+            lidar_pts, 
+            goal_robot_frame,
+            max_v=0.35,
+            max_w=2.0
+        )

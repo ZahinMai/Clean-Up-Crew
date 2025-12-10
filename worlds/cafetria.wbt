@@ -10,15 +10,13 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/chairs/protos/Chair.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/robotis/turtlebot/protos/TurtleBot3Burger.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/devices/robotis/protos/RobotisLds01.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/devices/hokuyo/protos/HokuyoUrg04lx.proto"
 
 WorldInfo {
   title "cafeteria"
 }
 Viewpoint {
-  orientation 0.537 -0.575 -0.617 4.309
-  position 0.846 -4.963 20.036
+  orientation 0.4480232157887697 0.776461281544455 -0.4431513019010911 1.8312404386110328
+  position -6.105817137224098 2.1072703784446176 18.51190893071993
 }
 TexturedBackground {
   texture "entrance_hall"
@@ -38,203 +36,341 @@ Floor {
     }
   }
 }
-
-# Walls
-Wall { translation -4 0 0 name "wall_west" size 0.06 12 2.5 }
-Wall { translation 4 0 0 name "wall_east" size 0.06 12 2.5 }
-Wall { translation 0 -6 0 rotation 0 0 1 1.5708 name "wall_south" size 0.06 8 2.5 }
-Wall { translation 0 6 0 rotation 0 0 1 1.5708 name "wall_north" size 0.06 8 2.5 }
-
-# Lights
-CeilingLight { translation -2 -4 2.5 }
-CeilingLight { translation -2 0 2.5 name "ceiling_light_1" }
-CeilingLight { translation -2 4 2.5 name "ceiling_light_2" }
-CeilingLight { translation 2 -3.45 2.5 name "ceiling_light_3" }
-CeilingLight { translation 2 0 2.5 name "ceiling_light_4" }
-CeilingLight { translation 2 4 2.5 name "ceiling_light_5" }
-
-# Tables & Chairs (9 sets)
-Table { translation -2.4 -3.5 0 size 1 1.6 0.74 }
-Chair { translation -2.4 -4.2 0 rotation 0 0 1 1.5708 }
-Chair { translation -2.4 -2.8 0 rotation 0 0 1 -1.5708 name "chair_1" }
-Chair { translation -2.8 -3.6 0 name "chair_2" }
-Chair { translation -2 -3.6 0 rotation 0 0 1 3.14159 name "chair_3" }
-
-Table { translation 0 -3.5 0 name "table_1" size 1 1.6 0.74 }
-Chair { translation 0 -4.2 0 rotation 0 0 1 1.5708 name "chair_4" }
-Chair { translation 0 -2.8 0 rotation 0 0 1 -1.5708 name "chair_5" }
-Chair { translation -0.4 -3.5 0 name "chair_6" }
-Chair { translation 0.5 -3.5 0 rotation 0 0 1 3.14159 name "chair_7" }
-
-Table { translation 2.4 -3.5 0 name "table_2" size 1 1.6 0.74 }
-Chair { translation 2.5 -4.2 0 rotation 0 0 1 1.5708 name "chair_8" }
-Chair { translation 2.5 -2.8 0 rotation 0 0 1 -1.5708 name "chair_9" }
-Chair { translation 2 -3.5 0 name "chair_10" }
-Chair { translation 2.9 -3.5 0 rotation 0 0 1 3.14159 name "chair_11" }
-
-Table { translation -2.4 0 0 name "table_3" size 1 1.6 0.74 }
-Chair { translation -2.4 -0.7 0 rotation 0 0 1 1.5708 name "chair_12" }
-Chair { translation -2.4 0.7 0 rotation 0 0 1 -1.5708 name "chair_13" }
-Chair { translation -2.8 0 0 name "chair_14" }
-Chair { translation -2 0 0 rotation 0 0 1 3.14159 name "chair_15" }
-
-Table { name "table_4" size 1 1.6 0.74 }
-Chair { translation 0 -0.7 0 rotation 0 0 1 1.5708 name "chair_16" }
-Chair { translation 0 0.7 0 rotation 0 0 1 -1.5708 name "chair_17" }
-Chair { translation -0.4 0 0 name "chair_18" }
-Chair { translation 0.4 0 0 rotation 0 0 1 3.14159 name "chair_19" }
-
-Table { translation 2.4 0 0 name "table_5" size 1 1.6 0.74 }
-Chair { translation 2.4 -0.7 0 rotation 0 0 1 1.5708 name "chair_20" }
-Chair { translation 2.4 0.7 0 rotation 0 0 1 -1.5708 name "chair_21" }
-Chair { translation 2 0 0 name "chair_22" }
-Chair { translation 2.8 0 0 rotation 0 0 1 3.14159 name "chair_23" }
-
-Table { translation -2.4 3.5 0 name "table_6" size 1 1.6 0.74 }
-Chair { translation -2.4 2.8 0 rotation 0 0 1 1.5708 name "chair_24" }
-Chair { translation -2.4 4.2 0 rotation 0 0 1 -1.5708 name "chair_25" }
-Chair { translation -2.8 3.5 0 name "chair_26" }
-Chair { translation -2 3.5 0 rotation 0 0 1 3.14159 name "chair_27" }
-
-Table { translation 0 3.5 0 name "table_7" size 1 1.6 0.74 }
-Chair { translation 0 2.8 0 rotation 0 0 1 1.5708 name "chair_28" }
-Chair { translation 0 4.2 0 rotation 0 0 1 -1.5708 name "chair_29" }
-Chair { translation -0.4 3.5 0 name "chair_30" }
-Chair { translation 0.5 3.5 0 rotation 0 0 1 3.14159 name "chair_31" }
-
-Table { translation 2.4 3.5 0 name "table_8" size 1 1.6 0.74 }
-Chair { translation 2.5 2.8 0 rotation 0 0 1 1.5708 name "chair_32" }
-Chair { translation 2.5 4.2 0 rotation 0 0 1 -1.5708 name "chair_33" }
-Chair { translation 2 3.5 0 name "chair_34" }
-Chair { translation 2.9 3.5 0 rotation 0 0 1 3.14159 name "chair_35" }
-
-# Collector Robots
-DEF collector_1 TurtleBot3Burger {
-  translation -1.2 0 0
+Wall {
+  translation -4 0 0
+  name "wall_west"
+  size 0.06 12 2.5
+}
+Wall {
+  translation 4 0 0
+  name "wall_east"
+  size 0.06 12 2.5
+}
+Wall {
+  translation 0 -6 0
   rotation 0 0 1 1.5708
+  name "wall_south"
+  size 0.06 8 2.5
+}
+Wall {
+  translation 0 6 0
+  rotation 0 0 1 1.5708
+  name "wall_north"
+  size 0.06 8 2.5
+}
+CeilingLight {
+  translation -2 -4 2.5
+}
+CeilingLight {
+  translation -2 0 2.5
+  name "ceiling_light_1"
+}
+CeilingLight {
+  translation -2 4 2.5
+  name "ceiling_light_2"
+}
+CeilingLight {
+  translation 2 -3.45 2.5
+  name "ceiling_light_3"
+}
+CeilingLight {
+  translation 2 0 2.5
+  name "ceiling_light_4"
+}
+CeilingLight {
+  translation 2 4 2.5
+  name "ceiling_light_5"
+}
+Table {
+  translation -2.4 -3.5 0
+  size 1 1.6 0.74
+}
+Chair {
+  translation -2.4 -4.2 0
+  rotation 0 0 1 1.5708
+}
+Chair {
+  translation -2.4 -2.8 0
+  rotation 0 0 1 -1.5708
+  name "chair_1"
+}
+Chair {
+  translation -2.8 -3.6 0
+  name "chair_2"
+}
+Chair {
+  translation -2 -3.6 0
+  rotation 0 0 1 3.14159
+  name "chair_3"
+}
+Table {
+  translation 0 -3.5 0
+  name "table_1"
+  size 1 1.6 0.74
+}
+Chair {
+  translation 0 -4.2 0
+  rotation 0 0 1 1.5708
+  name "chair_4"
+}
+Chair {
+  translation 0 -2.8 0
+  rotation 0 0 1 -1.5708
+  name "chair_5"
+}
+Chair {
+  translation -0.4 -3.5 0
+  name "chair_6"
+}
+Chair {
+  translation 0.5 -3.5 0
+  rotation 0 0 1 3.14159
+  name "chair_7"
+}
+Table {
+  translation 2.4 -3.5 0
+  name "table_2"
+  size 1 1.6 0.74
+}
+Chair {
+  translation 2.5 -4.2 0
+  rotation 0 0 1 1.5708
+  name "chair_8"
+}
+Chair {
+  translation 2.5 -2.8 0
+  rotation 0 0 1 -1.5708
+  name "chair_9"
+}
+Chair {
+  translation 2 -3.5 0
+  name "chair_10"
+}
+Chair {
+  translation 2.9 -3.5 0
+  rotation 0 0 1 3.14159
+  name "chair_11"
+}
+Table {
+  translation -2.4 0 0
+  name "table_3"
+  size 1 1.6 0.74
+}
+Chair {
+  translation -2.4 -0.7 0
+  rotation 0 0 1 1.5708
+  name "chair_12"
+}
+Chair {
+  translation -2.4 0.7 0
+  rotation 0 0 1 -1.5708
+  name "chair_13"
+}
+Chair {
+  translation -2.8 0 0
+  name "chair_14"
+}
+Chair {
+  translation -2 0 0
+  rotation 0 0 1 3.14159
+  name "chair_15"
+}
+Table {
+  name "table_4"
+  size 1 1.6 0.74
+}
+Chair {
+  translation 0 -0.7 0
+  rotation 0 0 1 1.5708
+  name "chair_16"
+}
+Chair {
+  translation 0 0.7 0
+  rotation 0 0 1 -1.5708
+  name "chair_17"
+}
+Chair {
+  translation -0.4 0 0
+  name "chair_18"
+}
+Chair {
+  translation 0.4 0 0
+  rotation 0 0 1 3.14159
+  name "chair_19"
+}
+Table {
+  translation 2.4 0 0
+  name "table_5"
+  size 1 1.6 0.74
+}
+Chair {
+  translation 2.4 -0.7 0
+  rotation 0 0 1 1.5708
+  name "chair_20"
+}
+Chair {
+  translation 2.4 0.7 0
+  rotation 0 0 1 -1.5708
+  name "chair_21"
+}
+Chair {
+  translation 2 0 0
+  name "chair_22"
+}
+Chair {
+  translation 2.8 0 0
+  rotation 0 0 1 3.14159
+  name "chair_23"
+}
+Table {
+  translation -2.4 3.5 0
+  name "table_6"
+  size 1 1.6 0.74
+}
+Chair {
+  translation -2.4 2.8 0
+  rotation 0 0 1 1.5708
+  name "chair_24"
+}
+Chair {
+  translation -2.4 4.2 0
+  rotation 0 0 1 -1.5708
+  name "chair_25"
+}
+Chair {
+  translation -2.8 3.5 0
+  name "chair_26"
+}
+Chair {
+  translation -2 3.5 0
+  rotation 0 0 1 3.14159
+  name "chair_27"
+}
+Table {
+  translation 0 3.5 0
+  name "table_7"
+  size 1 1.6 0.74
+}
+Chair {
+  translation 0 2.8 0
+  rotation 0 0 1 1.5708
+  name "chair_28"
+}
+Chair {
+  translation 0 4.2 0
+  rotation 0 0 1 -1.5708
+  name "chair_29"
+}
+Chair {
+  translation -0.4 3.5 0
+  name "chair_30"
+}
+Chair {
+  translation 0.5 3.5 0
+  rotation 0 0 1 3.14159
+  name "chair_31"
+}
+Table {
+  translation 2.4 3.5 0
+  name "table_8"
+  size 1 1.6 0.74
+}
+Chair {
+  translation 2.5 2.8 0
+  rotation 0 0 1 1.5708
+  name "chair_32"
+}
+Chair {
+  translation 2.5 4.2 0
+  rotation 0 0 1 -1.5708
+  name "chair_33"
+}
+Chair {
+  translation 2 3.5 0
+  name "chair_34"
+}
+Chair {
+  translation 2.9 3.5 0
+  rotation 0 0 1 3.14159
+  name "chair_35"
+}
+DEF collector1 TurtleBot3Burger {
+  translation -3.1013834389162 1.8300015038399569 -0.00024773920606359356
+  rotation 0.0023209661318970808 -4.898376353835309e-06 0.999997306542483 -3.1415926282635946
   name "collector_1"
   controller "collector"
   extensionSlot [
-    RobotisLds01 { }
-    InertialUnit { }
-    GPS { }
-    Emitter { channel 1 }
-    Receiver { channel 1 }
+    RobotisLds01 {
+    }
+    InertialUnit {
+    }
+    GPS {
+    }
+    Emitter {
+      channel 1
+    }
+    Receiver {
+      channel 1
+    }
   ]
 }
-
-DEF collector_2 TurtleBot3Burger {
-  translation 1.2 0 0
-  rotation 0 0 1 1.5708
+DEF collector2 TurtleBot3Burger {
+  translation 2.4313504253700517 -1.8298879069727132 -0.0002477392063426828
+  rotation 0.0027659462874998586 0.9417911680021912 0.3361870690764342 -0.004928828611680203
   name "collector_2"
   controller "collector"
   extensionSlot [
-    RobotisLds01 { }
-    InertialUnit { }
-    GPS { }
-    Emitter { channel 1 }
-    Receiver { channel 1 }
+    RobotisLds01 {
+    }
+    InertialUnit {
+    }
+    GPS {
+    }
+    Emitter {
+      channel 1
+    }
+    Receiver {
+      channel 1
+    }
   ]
 }
-
-# Human Agent
-TurtleBot3Burger {
-  translation -0.5 -0.2 0
-  name "HumanAgent"
+DEF human TurtleBot3Burger {
+  translation 0 -1.8298879069727132 -0.0002477392063426828
+  rotation 0.0027659462874998586 0.9417911680021912 0.3361870690764342 -0.004928828611680203
+  name "pesky human"
   controller "human_agent"
   extensionSlot [
-    GPS { }
-    RobotisLds01 { }
+    RobotisLds01 {
+    }
+    InertialUnit {
+    }
+    GPS {
+    }
+    Emitter {
+      channel 1
+    }
+    Receiver {
+      channel 1
+    }
   ]
 }
-
-# Test Spotter
-E-puck {
-  translation -2 -5 0
+DEF spotter TurtleBot3Burger {
+  translation 2.2000046490888248 1.049008185876706 -0.00035900977803383916
+  rotation -0.0011816475225585035 0.0012666173949227567 0.9999984996936282 1.5645174478508965
+  name "spotter"
   controller "test_spotter_comm"
-  window "<none>"
-  turretSlot [
-    Compass { }
+  extensionSlot [
+    RobotisLds01 {
+    }
+    InertialUnit {}
     GPS { }
-    HokuyoUrg04lx { name "lidar" enablePhysics FALSE }
+    Emitter {
+      channel 1
+    }
+    Receiver {
+      channel 1
+    }
+    Camera{}
   ]
-}
-
-# Supervisor
-Robot {
-  children [ Receiver { channel 1 } ]
-  name "SUPERVISOR"
-  controller "supervisor"
   supervisor TRUE
-}
-
-# Trash Objects (10 items)
-DEF TRASH_0 Solid {
-  translation -1.746 1.597 0.05
-  children [ Shape { appearance PBRAppearance { baseColor 0 0 1 } geometry Sphere { radius 0.05 } } ]
-  boundingObject Sphere { radius 0.05 }
-  physics Physics { density -1 mass 0.1 }
-}
-DEF TRASH_1 Solid {
-  translation 0.102 -2.432 0.05
-  name "solid(1)"
-  children [ Shape { appearance PBRAppearance { baseColor 0 0 1 } geometry Sphere { radius 0.05 } } ]
-  boundingObject Sphere { radius 0.05 }
-  physics Physics { density -1 mass 0.1 }
-}
-DEF TRASH_2 Solid {
-  translation -1.484 -5.007 0.05
-  name "solid(2)"
-  children [ Shape { appearance PBRAppearance { baseColor 0 0 1 } geometry Sphere { radius 0.05 } } ]
-  boundingObject Sphere { radius 0.05 }
-  physics Physics { density -1 mass 0.1 }
-}
-DEF TRASH_3 Solid {
-  translation -1.289 -1.526 0.05
-  name "solid(3)"
-  children [ Shape { appearance PBRAppearance { baseColor 0 0 1 } geometry Sphere { radius 0.05 } } ]
-  boundingObject Sphere { radius 0.05 }
-  physics Physics { density -1 mass 0.1 }
-}
-DEF TRASH_4 Solid {
-  translation 2.102 -1.928 0.05
-  name "solid(4)"
-  children [ Shape { appearance PBRAppearance { baseColor 0 0 1 } geometry Sphere { radius 0.05 } } ]
-  boundingObject Sphere { radius 0.05 }
-  physics Physics { density -1 mass 0.1 }
-}
-DEF TRASH_5 Solid {
-  translation -3.178 1.292 0.05
-  name "solid(5)"
-  children [ Shape { appearance PBRAppearance { baseColor 0 0 1 } geometry Sphere { radius 0.05 } } ]
-  boundingObject Sphere { radius 0.05 }
-  physics Physics { density -1 mass 0.1 }
-}
-DEF TRASH_6 Solid {
-  translation -2.892 -2.315 0.05
-  name "solid(6)"
-  children [ Shape { appearance PBRAppearance { baseColor 0 0 1 } geometry Sphere { radius 0.05 } } ]
-  boundingObject Sphere { radius 0.05 }
-  physics Physics { density -1 mass 0.1 }
-}
-DEF TRASH_7 Solid {
-  translation -0.842 -3.315 0.05
-  name "solid(7)"
-  children [ Shape { appearance PBRAppearance { baseColor 0 0 1 } geometry Sphere { radius 0.05 } } ]
-  boundingObject Sphere { radius 0.05 }
-  physics Physics { density -1 mass 0.1 }
-}
-DEF TRASH_8 Solid {
-  translation -3.001 2.022 0.05
-  name "solid(8)"
-  children [ Shape { appearance PBRAppearance { baseColor 0 0 1 } geometry Sphere { radius 0.05 } } ]
-  boundingObject Sphere { radius 0.05 }
-  physics Physics { density -1 mass 0.1 }
-}
-DEF TRASH_9 Solid {
-  translation 0.14 -3.015 0.05
-  name "solid(9)"
-  children [ Shape { appearance PBRAppearance { baseColor 0 0 1 } geometry Sphere { radius 0.05 } } ]
-  boundingObject Sphere { radius 0.05 }
-  physics Physics { density -1 mass 0.1 }
 }
