@@ -354,11 +354,11 @@ DEF human TurtleBot3Burger {
     }
   ]
 }
-DEF spotter TurtleBot3Burger {
+DEF auctioneer TurtleBot3Burger {
   translation 2.2000046490888248 1.049008185876706 -0.00035900977803383916
   rotation -0.0011816475225585035 0.0012666173949227567 0.9999984996936282 1.5645174478508965
-  name "spotter"
-  controller "test_spotter_comm"
+  name "auctioneer"
+  controller "auctioneer"
   extensionSlot [
     RobotisLds01 {
     }
