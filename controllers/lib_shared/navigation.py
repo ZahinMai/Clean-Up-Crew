@@ -1,8 +1,8 @@
 # ============================================= #
 #  NAVIGATION MODULE          -> AUTHOR: ZAHIN  #
 # ============================================= #
-# Combines A* global planning with local control
-# Robot-agnostic: input pose/lidar, output (v,w)
+# A* path lanning w/ dynamic obstacle avoidance #
+# Robot-agnostic: input pose/lidar, output (v,w)#
 # ============================================= #
 
 import math
@@ -11,7 +11,7 @@ from typing import List, Tuple, Optional
 
 from .global_planner import AStarPlanner
 from .map_module import visualise_map, get_map
-from .local_planner import SimpleAvoidance
+from .obstacle_avoidance import SimpleAvoidance
 
 class Navigator:
     """Handles path planning and following for differential-drive robots."""

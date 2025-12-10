@@ -1,6 +1,9 @@
-# ============================================= #
-#  WORLD MAP & POS DEBUG     -> AUTHOR: ZAHIN   #
-# ============================================= #
+# ============================================== #
+#  WORLD REPRESENTATION         -> AUTHOR: ZAHIN #
+# ============================================== #
+# Here, we have the representation of the world  #
+# for A* alongside ascii print of robot position #
+# ============================================== #
 import math
 from typing import Tuple, List, Optional
 CELL_SIZE = 8/24  # meters per grid cell

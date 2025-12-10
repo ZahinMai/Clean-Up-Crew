@@ -1,6 +1,9 @@
-# =============================================================================
-# COLLECTOR FSM - FOR COLLECTOR BOTS                          -> Author: ZAHIN
-# =============================================================================
+# ============================================= #
+#  COLLECTOR FSM              -> AUTHOR: ZAHIN  #
+# ============================================= #
+# Controller for Collector bots in task auction #
+# config. Bid on tasks & navigate with A*       #
+# ============================================= #
 from controller import Robot
 import math, os, sys
 

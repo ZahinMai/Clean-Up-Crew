@@ -1,6 +1,10 @@
-# =============================================================================
-# SPOTTER AUCTION TEST (SUPERVISOR)                           -> Author: ZAHIN
-# =============================================================================
+# ============================================= #
+#  TASK MANAGER/ AUCTIIONEER  -> AUTHOR: ZAHIN  #
+# ==============================================#
+# Supervisor. Spawns trash & assigns collection #
+# to Collector bots by which one is closest     #
+# ============================================= #
+
 from controller import Supervisor
 import json, sys, os
 
