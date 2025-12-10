@@ -19,7 +19,6 @@ from lib_shared.dual_logger import Logger
 # =============================================================================
 # CONFIGURATION & UTILITIES
 # =============================================================================
-
 WHEEL_RADIUS = 0.0325
 AXLE_LENGTH = 0.16
 DWA_ENABLED = False  # TO TOGGLE DWA AS IT IS A POINT OF FAILURE!!!
@@ -106,16 +105,19 @@ class Collector(Robot):
         self.ry = 0.0
         self.yaw = 0.0
 
-        print(f"Initialised in IDLE state")
+        print(f"{self.robot_id}: Initialised in IDLE state")
 
     # ---------------------------------------------------------------------- #
     # Pose & messaging                                                       #
     # ---------------------------------------------------------------------- #
 
     def update_pose(self):
-        """Update robot pose from sensors."""
+        """Update robot pose from sensors (x,z on ground plane)."""
         if self.gps.getSamplingPeriod() > 0:
-            self.rx, self.ry = self.gps.getValues()[:2]
+            # CHANGED: use x and z, ignore height (y)
+            x, _, z = self.gps.getValues()
+            self.rx, self.ry = x, z
+
         if self.imu.getSamplingPeriod() > 0:
             self.yaw = self.imu.getRollPitchYaw()[2]
 
@@ -157,7 +159,6 @@ class Collector(Robot):
         """Accept task and transition to NAVIGATING."""
         if msg.get("collector_id") != self.robot_id:
             return
-
         task_id = msg.get("task_id")
         x = msg.get("target_x")
         z = msg.get("target_z")
@@ -165,7 +166,7 @@ class Collector(Robot):
             print("ERROR: Invalid task assignment")
             return
 
-        print(f"Assigned {task_id} → ({x:.2f}, {z:.2f})")
+        print(f"{self.robot_id}: Assigned {task_id} → ({x:.2f}, {z:.2f})")
         self.current_task_id = task_id
 
         # Plan path using shared navigator
@@ -183,7 +184,6 @@ class Collector(Robot):
         msg = self.comm.receive()
         if not msg:
             return
-
         event = msg.get("event")
         if event == "auction_start":
             self.handle_auction_start(msg)
