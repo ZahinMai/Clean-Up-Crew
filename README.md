@@ -71,6 +71,11 @@ Implemented in `lib_shared/communication.py`.
       * The **Spotter** will begin its patrol pattern.
       * **Collectors** will idle until receiving tasks.
 
+### Switching Setups for Hypothesis Evaluation 
+The two existing modes are `Auction` and `Coverage` with the former being the default setup.
+To switch setups, navigate to the Auctioneer bot in the scene tree and edit the `customData` field to be `SETUP:COVERAGE`.
+To return to the original setup, edit this same field to be `SETUP:AUCTION`.
+
 ### Running Automated Tests
 
 To verify the auction logic and navigation without waiting for the full simulation loop:
