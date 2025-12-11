@@ -1,5 +1,5 @@
 # ============================================= #
-# TASK MANAGER/ AUCTIIONEER   -> ABDUL & ZAHIN  #
+# TASK MANAGER/ AUCTIONEER   -> ABDUL & ZAHIN  #
 # ==============================================#
 # Spawns rubbish & assigns collection           #
 # to Collector bots by which one is closest     #
@@ -16,8 +16,8 @@ from lib_shared.dual_logger import Logger
 from lib_shared.map_module import get_map
 
 # --- rubbish DEFINITION ---
-TRASH_TEMPLATE = """
-DEF TRASH_%d Solid {
+RUBBISH_TEMPLATE = """
+DEF RUBBISH_%d Solid {
   translation %f %f 0.1
   children [
     Shape {
@@ -68,7 +68,7 @@ class SpotterTester(Supervisor):
         self.completed_task_ids = set()
 
         # Test Locations (X, Y/Z, Name)
-        self.trash_locations = []
+        self.rubbish_locations = []
         self.location_index = 0
 
         # --- SPAWN rubbish ---
@@ -103,24 +103,24 @@ class SpotterTester(Supervisor):
             x, y = self.occupancy_grid.grid_to_world(row, col)
 
             # Track this rubbish location
-            self.trash_locations.append((x, y, f"rubbish at ({x}, {y})"))
+            self.rubbish_locations.append((x, y, f"rubbish at ({x}, {y})"))
 
             # Remove any existing object with this DEF, just like before
-            existing_node = self.getFromDef(f"TRASH_{i}")
+            existing_node = self.getFromDef(f"RUBBISH_{i}")
             if existing_node:
                 existing_node.remove()
 
             # Spawn the rubbish at the chosen free cell
-            trash_str = TRASH_TEMPLATE % (i, x, y)
-            self.root_children.importMFNodeFromString(-1, trash_str)
+            rubbish_str = RUBBISH_TEMPLATE % (i, x, y)
+            self.root_children.importMFNodeFromString(-1, rubbish_str)
             
-    def remove_trash(self, task_id):
+    def remove_rubbish(self, task_id):
         """Removes the rubbish associated with the given task ID."""
-        node_def = f"TRASH_{task_id}"
-        trash_node = self.getFromDef(node_def)
+        node_def = f"RUBBISH_{task_id}"
+        rubbish_node = self.getFromDef(node_def)
         
-        if trash_node:
-            trash_node.remove()
+        if rubbish_node:
+            rubbish_node.remove()
             print(f"Deleted object: {node_def}")
         else:
             print(f"Warning: Could not find {node_def} to delete.")
@@ -147,7 +147,7 @@ class SpotterTester(Supervisor):
     # -------------------------------------------------------------------------
     def handle_idle(self, msg):
         # Stop if all tasks done
-        if len(self.completed_task_ids) >= len(self.trash_locations): return
+        if len(self.completed_task_ids) >= len(self.rubbish_locations): return
 
         # Queue logic
         if self.auction_active:
@@ -180,10 +180,10 @@ class SpotterTester(Supervisor):
         
         self.completed_task_ids.add(task_id)
 
-        self.remove_trash(task_id)
+        self.remove_rubbish(task_id)
 
         # Check for Termination
-        if len(self.completed_task_ids) >= len(self.trash_locations):
+        if len(self.completed_task_ids) >= len(self.rubbish_locations):
             print("="*70)
             print("ALL TASKS COMPLETED. SAVING LOGS & EXITING.")
             print("="*70)
@@ -195,11 +195,11 @@ class SpotterTester(Supervisor):
     # -------------------------------------------------------------------------
     def start_auction(self):
         # If no more rubbish to collect, exit
-        if self.location_index >= len(self.trash_locations):
+        if self.location_index >= len(self.rubbish_locations):
             return
         
         # Else get next rubbish location
-        x, z, name = self.trash_locations[self.location_index]
+        x, z, name = self.rubbish_locations[self.location_index]
         task_id = self.location_index
         
         self.location_index += 1
@@ -236,7 +236,7 @@ class SpotterTester(Supervisor):
             winner_id, winner_cost = min(bids, key=lambda x: x[1])
             print(f"Winner: {winner_id} (cost: {winner_cost:.2f})")
             
-            target_x, target_z, _ = self.trash_locations[task_id]
+            target_x, target_z, _ = self.rubbish_locations[task_id]
 
             self.send_message({
                 "event": "assign_task",
