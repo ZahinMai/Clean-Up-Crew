@@ -1,19 +1,15 @@
 # Human_agent controller
-# TurtleBot "pesky human" that walks a fixed loop of waypoints
 # using shared DWA for obstacle avoidance.
-#
 # Folder name:  Human_agent
-# File name:    human_agent.py
-# World:        controller "Human_agent" on the human TurtleBot3Burger
+# File name:    Human_agent.py
 
 from controller import Robot
 import math
 import os
 import sys
 
-# ---------------------------------------------------------------------
+
 # Import shared local planner (DWA)
-# ---------------------------------------------------------------------
 THIS_DIR = os.path.dirname(__file__)
 CTRL_DIR = os.path.dirname(THIS_DIR)
 if CTRL_DIR not in sys.path:
@@ -21,9 +17,7 @@ if CTRL_DIR not in sys.path:
 
 from lib_shared.local_planner import DWA  # noqa: E402
 
-# ---------------------------------------------------------------------
 # Robot / device names (TurtleBot3Burger defaults)
-# ---------------------------------------------------------------------
 LEFT_MOTOR = "left wheel motor"
 RIGHT_MOTOR = "right wheel motor"
 
@@ -45,12 +39,9 @@ WAYPOINTS = [
     (0.10, 0.20),
 ]
 
-
-# ---------------------------------------------------------------------
 # Small helpers
-# ---------------------------------------------------------------------
 def dev(robot: Robot, name: str):
-    """Safe device getter (returns None if missing)."""
+    """Safe device getr (returns None if missing)."""
     try:
         return robot.getDevice(name)
     except Exception:
@@ -60,8 +51,7 @@ def dev(robot: Robot, name: str):
 def yaw_from(imu, compass) -> float:
     """
     Return yaw (heading) in radians.
-
-    Prefer the compass (more stable for planar robots),
+    Prefer the compass 
     fall back to IMU if needed.
     """
     # Compass: vector towards north; yaw = 0 along +x
@@ -94,7 +84,6 @@ def world_to_robot(dx: float, dz: float, yaw: float):
 def get_lidar_points(lidar, max_r=3.0, min_r=0.08, downsample=3):
     """
     Convert lidar scan to a small set of (x, y) points in robot frame.
-
     downsample: only every Nth ray is used to keep DWA cheap.
     """
     if not lidar:
@@ -124,10 +113,7 @@ def get_lidar_points(lidar, max_r=3.0, min_r=0.08, downsample=3):
 
     return pts
 
-
-# ---------------------------------------------------------------------
 # Main controller
-# ---------------------------------------------------------------------
 def main():
     robot = Robot()
     ts = int(robot.getBasicTimeStep())
@@ -157,7 +143,7 @@ def main():
     if lidar:
         lidar.enable(ts)
 
-    # ---- Lighter DWA configuration for "human" agent ----------------
+    #  Lighter DWA configuration for "human" agent 
     dwa = DWA(
         {
             # Search / prediction parameters (reduced for speed)
@@ -203,7 +189,7 @@ def main():
         x, _, z = gps.getValues()
         yaw = yaw_from(imu, compass)
 
-        # ---- Patrol waypoint logic -----------------------------------
+        #  Patrol waypoint logic 
         tx, tz = WAYPOINTS[wp_idx]
         dx = tx - x
         dz = tz - z
@@ -211,10 +197,10 @@ def main():
             wp_idx = (wp_idx + 1) % len(WAYPOINTS)
             continue
 
-        # ---- Lidar processing (down-sampled) -------------------------
+        # Lidar processing (down-sampled) 
         lidar_pts = get_lidar_points(lidar)
 
-        # ---- Stuck detection (very light) ----------------------------
+        # Stuck detection (very light)
         if last_x is None:
             last_x, last_z = x, z
             last_move_time = now
@@ -228,10 +214,10 @@ def main():
                 recovery_sign *= -1.0
                 recovery_until = now + 2.0
 
-        # ---- Goal in robot frame -------------------------------------
+        #Goal in robot frame 
         gx, gy = world_to_robot(dx, dz, yaw)
 
-        # ---- Command selection ---------------------------------------
+        #Command selection 
         if recovery_until > now:
             # Simple escape manoeuvre if stuck
             v = -0.18
