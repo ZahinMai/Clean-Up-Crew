@@ -1,5 +1,5 @@
 # ============================================= #
-# TASK MANAGER/ AUCTIIONEER   -> ABDUL & ZAHIN  #
+# TASK MANAGER/ AUCTIONEER    -> ABDUL & ZAHIN  #
 # ==============================================#
 # Supervisor. Spawns rubbish & assigns collection #
 # to Collector bots by which one is closest     #
@@ -16,8 +16,8 @@ from lib_shared.dual_logger import Logger
 from lib_shared.map_module import get_map
 
 # --- rubbish DEFINITION ---
-TRASH_TEMPLATE = """
-DEF TRASH_%d Solid {
+RUBBISH_TEMPLATE = """
+DEF RUBBISH_%d Solid {
   translation %f %f 0.1
   children [
     Shape {
@@ -68,14 +68,50 @@ class SpotterTester(Supervisor):
         self.completed_task_ids = set()
 
         # Test Locations (X, Y/Z, Name)
-        self.trash_locations = []
+        self.rubbish_locations = []
         self.location_index = 0
+
+        self.setup = "AUCTION" # Default
+        self_node = self.getFromDef("auctioneer")
+        if self_node:
+            data = self_node.getField("customData").getSFString()
+            if "SETUP:COVERAGE" in data:
+                self.setup = "COVERAGE"
+            elif "SETUP:AUCTION" in data:
+                self.setup = "AUCTION"
+        
+        print(f"INITIALIZING IN {self.setup} SETUP")
 
         # --- SPAWN rubbish ---
         self.root_children = self.getRoot().getField("children")
         self.spawn_rubbish()
+        
+        # Broadcast Setup immediately after spawn
+        self.broadcast_setup()
 
-        print("SPOTTER AUCTION TEST (AUTO) STARTED")
+        print("SPOTTER SUPERVISOR STARTED")
+
+    # -------------------------------------------------------------------------
+    # CONFIGURATION BROADCAST
+    # -------------------------------------------------------------------------
+    def broadcast_setup(self):
+        """Sends the current setup and full rubbish list to all collectors."""
+        # Format rubbish list for JSON: [(x, y, id), ...]
+        # We use the index as the ID
+        clean_list = []
+        for i, (x, y, _) in enumerate(self.rubbish_locations):
+            clean_list.append({"id": i, "x": x, "y": y})
+
+        msg = {
+            "event": "configure",
+            "setup": self.setup,
+            "rubbish_list": clean_list
+        }
+        
+        # Send multiple times to ensure collectors wake up and receive it
+        for _ in range(5):
+            self.send_message(msg)
+            self.step(self.timestep)
 
     # -------------------------------------------------------------------------
     # SUPERVISOR METHODS (Spawn/Delete)
@@ -92,7 +128,6 @@ class SpotterTester(Supervisor):
             if self.occupancy_grid.is_free(r, c)
         ]
 
-
         num_rubbish = min(10, len(free_cells))
 
         # Pick random distinct free cells
@@ -103,24 +138,24 @@ class SpotterTester(Supervisor):
             x, y = self.occupancy_grid.grid_to_world(row, col)
 
             # Track this rubbish location
-            self.trash_locations.append((x, y, f"rubbish at ({x}, {y})"))
+            self.rubbish_locations.append((x, y, f"rubbish at ({x}, {y})"))
 
             # Remove any existing object with this DEF, just like before
-            existing_node = self.getFromDef(f"TRASH_{i}")
+            existing_node = self.getFromDef(f"RUBBISH_{i}")
             if existing_node:
                 existing_node.remove()
 
             # Spawn the rubbish at the chosen free cell
-            trash_str = TRASH_TEMPLATE % (i, x, y)
-            self.root_children.importMFNodeFromString(-1, trash_str)
+            rubbish_str = RUBBISH_TEMPLATE % (i, x, y)
+            self.root_children.importMFNodeFromString(-1, rubbish_str)
             
-    def remove_trash(self, task_id):
+    def remove_rubbish(self, task_id):
         """Removes the rubbish associated with the given task ID."""
-        node_def = f"TRASH_{task_id}"
-        trash_node = self.getFromDef(node_def)
+        node_def = f"RUBBISH_{task_id}"
+        rubbish_node = self.getFromDef(node_def)
         
-        if trash_node:
-            trash_node.remove()
+        if rubbish_node:
+            rubbish_node.remove()
             print(f"Deleted object: {node_def}")
         else:
             print(f"Warning: Could not find {node_def} to delete.")
@@ -147,7 +182,11 @@ class SpotterTester(Supervisor):
     # -------------------------------------------------------------------------
     def handle_idle(self, msg):
         # Stop if all tasks done
-        if len(self.completed_task_ids) >= len(self.trash_locations): return
+        if len(self.completed_task_ids) >= len(self.rubbish_locations): return
+        
+        # In COVERAGE setup, collectors are running their coverage pattern.
+        if self.setup == "COVERAGE":
+            return
 
         # Queue logic
         if self.auction_active:
@@ -156,6 +195,8 @@ class SpotterTester(Supervisor):
             self.start_auction()
 
     def handle_bid(self, msg):
+        if self.setup == "COVERAGE": return # Ignore bids in coverage mode
+
         collector_id = msg.get("collector_id")
         task_id = msg.get("task_id")
         cost = msg.get("cost")
@@ -180,10 +221,10 @@ class SpotterTester(Supervisor):
         
         self.completed_task_ids.add(task_id)
 
-        self.remove_trash(task_id)
+        self.remove_rubbish(task_id)
 
         # Check for Termination
-        if len(self.completed_task_ids) >= len(self.trash_locations):
+        if len(self.completed_task_ids) >= len(self.rubbish_locations):
             print("="*70)
             print("ALL TASKS COMPLETED. SAVING LOGS & EXITING.")
             print("="*70)
@@ -195,11 +236,11 @@ class SpotterTester(Supervisor):
     # -------------------------------------------------------------------------
     def start_auction(self):
         # If no more rubbish to collect, exit
-        if self.location_index >= len(self.trash_locations):
+        if self.location_index >= len(self.rubbish_locations):
             return
         
         # Else get next rubbish location
-        x, z, name = self.trash_locations[self.location_index]
+        x, z, name = self.rubbish_locations[self.location_index]
         task_id = self.location_index
         
         self.location_index += 1
@@ -236,7 +277,7 @@ class SpotterTester(Supervisor):
             winner_id, winner_cost = min(bids, key=lambda x: x[1])
             print(f"Winner: {winner_id} (cost: {winner_cost:.2f})")
             
-            target_x, target_z, _ = self.trash_locations[task_id]
+            target_x, target_z, _ = self.rubbish_locations[task_id]
 
             self.send_message({
                 "event": "assign_task",
@@ -259,6 +300,10 @@ class SpotterTester(Supervisor):
     # -------------------------------------------------------------------------
     def run(self):
         while self.step(self.timestep) != -1:
+            # Re-broadcast setup periodically 
+            if self.getTime() % 5.0 < (self.timestep / 1000.0):
+                 self.broadcast_setup()
+
             for msg in self.receive_messages():
                 event = msg.get("event")
                 if event == "idle":
@@ -268,7 +313,8 @@ class SpotterTester(Supervisor):
                 elif event == "collected":
                     self.handle_collected(msg)
 
-            self.finish_auction_if_ready()
+            if self.setup == "AUCTION":
+                self.finish_auction_if_ready()
 
 if __name__ == "__main__":
     SpotterTester().run()

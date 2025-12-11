@@ -15,8 +15,8 @@ WorldInfo {
   title "cafeteria"
 }
 Viewpoint {
-  orientation 0.4480232157887697 0.776461281544455 -0.4431513019010911 1.8312404386110328
-  position -6.105817137224098 2.1072703784446176 18.51190893071993
+  orientation 0.5668430270098576 0.5677510387593474 -0.5969486918638686 2.063453473103192
+  position 0.7780523008885484 1.9569105528152457 44.473177243563704
 }
 TexturedBackground {
   texture "entrance_hall"
@@ -295,11 +295,13 @@ Chair {
   name "chair_35"
 }
 DEF collector1 TurtleBot3Burger {
-  translation -3.1013834389162 1.8300015038399569 -0.00024773920606359356
+  translation -1.2 0 -0.000247739
   rotation 0.0023209661318970808 -4.898376353835309e-06 0.999997306542483 -3.1415926282635946
   name "collector_1"
   controller "collector"
   extensionSlot [
+    Camera {
+    }
     RobotisLds01 {
     }
     InertialUnit {
@@ -315,11 +317,13 @@ DEF collector1 TurtleBot3Burger {
   ]
 }
 DEF collector2 TurtleBot3Burger {
-  translation 2.4313504253700517 -1.8298879069727132 -0.0002477392063426828
+  translation 1.2 0 -0.000247739
   rotation 0.0027659462874998586 0.9417911680021912 0.3361870690764342 -0.004928828611680203
   name "collector_2"
   controller "collector"
   extensionSlot [
+    Camera {
+    }
     RobotisLds01 {
     }
     InertialUnit {
@@ -335,7 +339,7 @@ DEF collector2 TurtleBot3Burger {
   ]
 }
 DEF human TurtleBot3Burger {
-  translation 0 -1.5 0
+  translation 0 -1.8298879069727132 -0.0002477392063426828
   rotation 0.0027659462874998586 0.9417911680021912 0.3361870690764342 -0.004928828611680203
   name "pesky human"
   controller "human_agent"
@@ -359,18 +363,22 @@ DEF auctioneer TurtleBot3Burger {
   rotation -0.0011816475225585035 0.0012666173949227567 0.9999984996936282 1.5645174478508965
   name "auctioneer"
   controller "auctioneer"
+  customData "SETUP:COVERAGE"
+  supervisor TRUE
   extensionSlot [
     RobotisLds01 {
     }
-    InertialUnit {}
-    GPS { }
+    InertialUnit {
+    }
+    GPS {
+    }
     Emitter {
       channel 1
     }
     Receiver {
       channel 1
     }
-    Camera{}
+    Camera {
+    }
   ]
-  supervisor TRUE
 }
