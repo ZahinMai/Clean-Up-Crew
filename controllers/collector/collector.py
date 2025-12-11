@@ -17,6 +17,8 @@ from lib_shared.communication import Communication
 from lib_shared.navigation import Navigator
 from lib_shared.dual_logger import Logger
 
+from collector_coverage import run_coverage_setup
+
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
@@ -82,7 +84,7 @@ class Collector(Robot):
         self.last_idle_broadcast = 0.0
         self.idle_interval       = 1.0
 
-        print(f"{self.robot_id}: Initialised in IDLE state")
+        print(f"{self.robot_id}: Initialised - Waiting for Setup...")
 
         # Inform auctioneer immediately (position updates next timestep)
         self.send_idle_status()
@@ -197,6 +199,16 @@ class Collector(Robot):
     # Main Loop
     # ------------------------------------------------------------------ #
     def run(self):
+        setup_mode, rubbish_list = self.wait_for_setup()
+
+        if setup_mode == "COVERAGE":
+            try:
+                run_coverage_setup(self, rubbish_list)
+            finally:
+                self.logger.stop()
+            return
+
+        # ELSE: Default Auction Logic
         print(f"\nCollector Started | Mode: Auction-Based\n")
 
         try:

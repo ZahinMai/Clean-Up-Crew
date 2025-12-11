@@ -1,7 +1,7 @@
 # Shared library for camera-based object detection.
 # Implemented by: Abdullateef Vahora
 
-def is_trash_visible(camera):
+def is_rubbish_visible(camera):
     """Analyses the camera's view for a cluster of blue pixels."""
     image_data = camera.getImageArray()
     

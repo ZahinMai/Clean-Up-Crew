@@ -1,5 +1,5 @@
 # Spotter controller (Setup 3)
-# Responsible for finding trash using an efficient search pattern.
+# Responsible for finding rubbish using an efficient search pattern.
 # Uses: navigation, obstacle_avoidance, vision, communication, auctioneer
 # Implemented by: Abdullateef Vahora
 # Auction integration by: Kunal (comm module) + merged test_spotter_comm logic
@@ -105,26 +105,26 @@ class HardwareInterface:
 
         return points
 
-    def is_trash_visible(self):
-        return vision.is_trash_visible(self.camera)
+    def is_rubbish_visible(self):
+        return vision.is_rubbish_visible(self.camera)
 
-    def report_trash(self, comm: Communication, reported_trash: Set[Tuple[float, float]]):
-        """Calculate trash coordinates 30cm ahead and broadcast once per spot."""
+    def report_rubbish(self, comm: Communication, reported_rubbish: Set[Tuple[float, float]]):
+        """Calculate rubbish coordinates 30cm ahead and broadcast once per spot."""
         rx, ry, yaw = self.get_pose()
         tx = round((rx + 0.3 * math.cos(yaw)), 2)
         ty = round((ry + 0.3 * math.sin(yaw)), 2)
 
         # Ignore if already reported nearby
-        for (ex, ey) in reported_trash:
+        for (ex, ey) in reported_rubbish:
             if math.hypot(tx - ex, ty - ey) < 0.5:
                 return
 
-        print(f"[SPOTTER] NEW TRASH FOUND at ({tx}, {ty})")
+        print(f"[SPOTTER] NEW RUBBISH FOUND at ({tx}, {ty})")
         comm.send({
-            "event": "trash_found",
+            "event": "rubbish_found",
             "pos": (tx, ty)
         })
-        reported_trash.add((tx, ty))
+        reported_rubbish.add((tx, ty))
 
     def set_velocities(self, v: float, w: float):
         wl = (v - w * self.cfg.AXLE_LENGTH / 2) / self.cfg.WHEEL_RADIUS
@@ -156,7 +156,7 @@ class SpotterController:
         self.active_path: List[Tuple[float, float]] = []
         self.prev_cmd: Tuple[float, float] = (0.0, 0.0)
 
-        self.reported_trash: Set[Tuple[float, float]] = set()
+        self.reported_rubbish: Set[Tuple[float, float]] = set()
 
         #  AUCTION STATE (from test_spotter_comm) 
         self.manual = False  # keep for completeness
@@ -388,8 +388,8 @@ class SpotterController:
             rx, ry, yaw = self.hardware.get_pose()
             obstacles = self.hardware.get_lidar_points()
 
-            if self.hardware.is_trash_visible():
-                self.hardware.report_trash(self.comm, self.reported_trash)
+            if self.hardware.is_rubbish_visible():
+                self.hardware.report_rubbish(self.comm, self.reported_rubbish)
 
             if self.waypoints_idx > len(self.mission_waypoints):
                 self.hardware.set_velocities(0, 0)
