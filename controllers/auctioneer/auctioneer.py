@@ -1,19 +1,21 @@
 # ============================================= #
-#  TASK MANAGER/ AUCTIIONEER  -> AUTHOR: ZAHIN  #
+# TASK MANAGER/ AUCTIIONEER   -> ABDUL & ZAHIN  #
 # ==============================================#
-# Supervisor. Spawns trash & assigns collection #
+# Supervisor. Spawns rubbish & assigns collection #
 # to Collector bots by which one is closest     #
 # ============================================= #
 
 from controller import Supervisor
 import json, sys, os
+from random import uniform, sample
 
 if os.path.dirname(os.path.dirname(__file__)) not in sys.path:
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from lib_shared.dual_logger import Logger
+from lib_shared.map_module import get_map
 
-# --- TRASH DEFINITION ---
+# --- rubbish DEFINITION ---
 TRASH_TEMPLATE = """
 DEF TRASH_%d Solid {
   translation %f %f 0.1
@@ -34,7 +36,7 @@ DEF TRASH_%d Solid {
   }
   physics Physics {
     density -1
-    mass 0.1
+    mass 1
   }
 }
 """
@@ -46,7 +48,7 @@ class SpotterTester(Supervisor):
         # Enable logging (writes to file in background)
         self.logger = Logger(prefix='spotter', enabled=True)
         self.logger.start()
-
+        self.occupancy_grid = get_map()
         self.timestep = int(self.getBasicTimeStep())
         
         # Comm Setup (Channel 1)
@@ -66,41 +68,54 @@ class SpotterTester(Supervisor):
         self.completed_task_ids = set()
 
         # Test Locations (X, Y/Z, Name)
-        self.test_locations = [
-            (1, 1.6, "Trash 0"),
-            (0.6, -2, "Trash 1"),
-            (-1.5, -5, "Trash 2"),
-             (-1.5, -1, "Trash 3"),
-        ]
+        self.trash_locations = []
         self.location_index = 0
 
-        # --- SPAWN TRASH ---
-        # NOTE: This requires 'supervisor' field to be TRUE in the Scene Tree!
+        # --- SPAWN rubbish ---
         self.root_children = self.getRoot().getField("children")
-        self.spawn_trash_objects()
+        self.spawn_rubbish()
 
         print("SPOTTER AUCTION TEST (AUTO) STARTED")
 
     # -------------------------------------------------------------------------
     # SUPERVISOR METHODS (Spawn/Delete)
     # -------------------------------------------------------------------------
-    def spawn_trash_objects(self):
-        """Spawns a trash object for every location in test_locations."""
-        print("Spawning trash objects...")
-        for i, (x, z, _) in enumerate(self.test_locations):
-            # 1. Check if it already exists (from previous run) and remove it
+    def spawn_rubbish(self):
+        """Spawns rubbish only on free cells in the occupancy grid."""
+        print("Spawning rubbish...")
+
+        # Collect all free cells from the grid
+        free_cells = [
+            (r, c)
+            for r in range(self.occupancy_grid.height)
+            for c in range(self.occupancy_grid.width)
+            if self.occupancy_grid.is_free(r, c)
+        ]
+
+
+        num_rubbish = min(10, len(free_cells))
+
+        # Pick random distinct free cells
+        chosen_cells = sample(free_cells, num_rubbish)
+
+        for i, (row, col) in enumerate(chosen_cells):
+            # Convert grid cell to world coordinates (cell center)
+            x, y = self.occupancy_grid.grid_to_world(row, col)
+
+            # Track this rubbish location
+            self.trash_locations.append((x, y, f"rubbish at ({x}, {y})"))
+
+            # Remove any existing object with this DEF, just like before
             existing_node = self.getFromDef(f"TRASH_{i}")
             if existing_node:
                 existing_node.remove()
 
-            # 2. Prepare the node string
-            trash_str = TRASH_TEMPLATE % (i, x, z)
-            
-            # 3. Import the node
+            # Spawn the rubbish at the chosen free cell
+            trash_str = TRASH_TEMPLATE % (i, x, y)
             self.root_children.importMFNodeFromString(-1, trash_str)
             
     def remove_trash(self, task_id):
-        """Removes the trash object associated with the given task ID."""
+        """Removes the rubbish associated with the given task ID."""
         node_def = f"TRASH_{task_id}"
         trash_node = self.getFromDef(node_def)
         
@@ -132,8 +147,7 @@ class SpotterTester(Supervisor):
     # -------------------------------------------------------------------------
     def handle_idle(self, msg):
         # Stop if all tasks done
-        if len(self.completed_task_ids) >= len(self.test_locations):
-            return
+        if len(self.completed_task_ids) >= len(self.trash_locations): return
 
         # Queue logic
         if self.auction_active:
@@ -166,11 +180,10 @@ class SpotterTester(Supervisor):
         
         self.completed_task_ids.add(task_id)
 
-        # --- VISUAL FEEDBACK: Remove the Trash ---
         self.remove_trash(task_id)
 
         # Check for Termination
-        if len(self.completed_task_ids) >= len(self.test_locations):
+        if len(self.completed_task_ids) >= len(self.trash_locations):
             print("="*70)
             print("ALL TASKS COMPLETED. SAVING LOGS & EXITING.")
             print("="*70)
@@ -181,10 +194,12 @@ class SpotterTester(Supervisor):
     # AUCTION LOGIC
     # -------------------------------------------------------------------------
     def start_auction(self):
-        if self.location_index >= len(self.test_locations):
+        # If no more rubbish to collect, exit
+        if self.location_index >= len(self.trash_locations):
             return
-
-        x, z, name = self.test_locations[self.location_index]
+        
+        # Else get next rubbish location
+        x, z, name = self.trash_locations[self.location_index]
         task_id = self.location_index
         
         self.location_index += 1
@@ -221,7 +236,7 @@ class SpotterTester(Supervisor):
             winner_id, winner_cost = min(bids, key=lambda x: x[1])
             print(f"Winner: {winner_id} (cost: {winner_cost:.2f})")
             
-            target_x, target_z, _ = self.test_locations[task_id]
+            target_x, target_z, _ = self.trash_locations[task_id]
 
             self.send_message({
                 "event": "assign_task",

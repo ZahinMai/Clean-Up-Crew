@@ -50,11 +50,9 @@ class Collector(Robot):
         self.robot_id = self.getName()
         self.state = "IDLE"
 
-        # Setup logging
+        # Setup Position Logging & Comm
         self.logger = Logger(prefix=self.robot_id, enabled=True)
         self.logger.start()
-
-        # Communication
         self.comm = Communication(self, CHANNEL)
 
         # ------ Sensor & Actuator Setup ------ #

@@ -14,14 +14,8 @@ from .map_module import visualise_map, get_map
 from .obstacle_avoidance import SimpleAvoidance
 
 class Navigator:
-    """Handles path planning and following for differential-drive robots."""
-    def __init__(
-        self,
-        map_inflation: int = 0,
-        vis_period: float = 6.0,
-        max_v: float = 0.35,
-        max_w: float = 2.0
-    ):
+    """Path planning & following for differential-drive robots."""
+    def __init__(self, map_inflation: int = 0, vis_period: float = 5.0, max_v: float = 0.35, max_w: float = 2.0):
         # Map + inflated planning grid
         self.grid = get_map()
         self.plan_grid = self.grid.inflate_obstacles(map_inflation)
@@ -39,7 +33,7 @@ class Navigator:
         self.last_vis = 0.0
     
     def plan_path(self, start: Tuple[float, float], goal: Tuple[float, float]) -> bool:
-        """Plan A* path from start to goal (world coordinates)."""
+        """Plan A* path start -> goal (world coordinates)."""
         sx, sy = start
         gx, gy = goal
         print(f"Planning: ({sx:.2f},{sy:.2f}) → ({gx:.2f},{gy:.2f})")
@@ -88,7 +82,9 @@ class Navigator:
 
         # Goal reached (no more waypoints)
         if not target:
-            self.clear_path()
+            # Clear current path
+            self.path_world = []
+            self.path_idx = 0
             return 0.0, 0.0, False
         
         # Transform target to robot frame
@@ -101,12 +97,7 @@ class Navigator:
             lidar_pts, (gx_r, gy_r), self.max_v, self.max_w
         )
         
-        return v, w, True
-    
-    def clear_path(self):
-        """Clear current path."""
-        self.path_world = []
-        self.path_idx = 0
+        return v, w, True       
     
     def _nearest_free(self, node: Tuple[int, int]) -> Optional[Tuple[int, int]]:
         """BFS to find nearest free grid cell."""

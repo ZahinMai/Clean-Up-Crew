@@ -338,7 +338,7 @@ DEF human TurtleBot3Burger {
   translation 0 -1.8298879069727132 -0.0002477392063426828
   rotation 0.0027659462874998586 0.9417911680021912 0.3361870690764342 -0.004928828611680203
   name "pesky human"
-  controller "human_agent"
+  controller ""
   extensionSlot [
     RobotisLds01 {
     }
