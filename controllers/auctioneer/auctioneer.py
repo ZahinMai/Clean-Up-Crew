@@ -31,9 +31,6 @@ AUCTION_STRATEGY = auction_strategy
 # How long to wait for bids before closing an auction
 AUCTION_WAIT_TIME = 2.0 # in seconds
 
-TRASH_TEMPLATE = """
-DEF TRASH_%d Solid {
-
 # --- rubbish DEFINITION ---
 RUBBISH_TEMPLATE = """
 DEF RUBBISH_%d Solid {
