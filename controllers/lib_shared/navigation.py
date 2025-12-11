@@ -122,3 +122,31 @@ class Navigator:
                     q.append((nr, nc))
         
         return None
+
+    def path_cost(self, start: Tuple[float, float], goal: Tuple[float, float]) -> float:
+        """Return A* path length (world distance) from start -> goal without altering active path."""
+        sx, sy = start
+        gx, gy = goal
+
+        # Convert to grid
+        start_node = self._nearest_free(self.plan_grid.world_to_grid(sx, sy))
+        goal_node = self._nearest_free(self.plan_grid.world_to_grid(gx, gy))
+
+        if not start_node or not goal_node:
+            return float('inf')
+
+        # Compute A* (do NOT modify self.path_world)
+        nodes = self.astar.plan(self.plan_grid, start_node, goal_node)
+        if not nodes:
+            return float('inf')
+
+        # Convert back to world coords to compute real distance
+        waypoints = [self.grid.grid_to_world(r, c) for r, c in nodes]
+
+        total = 0.0
+        for i in range(len(waypoints) - 1):
+            x1, y1 = waypoints[i]
+            x2, y2 = waypoints[i + 1]
+            total += math.hypot(x2 - x1, y2 - y1)
+
+        return total
