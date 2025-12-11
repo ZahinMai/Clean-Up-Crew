@@ -16,7 +16,7 @@ project_root = os.getcwd()
 controllers_root = os.path.dirname(project_root)
 sys.path.append(controllers_root)
 
-from lib_shared import vision
+from controllers.auctioneer.archive import vision
 from lib_shared.coverage import CoveragePlanner
 from lib_shared.communication import Communication
 from lib_shared.global_planner import AStarPlanner

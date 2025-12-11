@@ -57,6 +57,11 @@ class Navigator:
         print("ERROR: No path found")
         return False
     
+    def clear_path(self):
+        """Clear current path"""
+        self.path_world = []
+        self.path_idx = 0
+
     def update(self,  pose: Tuple[float, float, float], lidar_pts: List[Tuple[float, float]], now: float ) -> Tuple[float, float, bool]:
         """Update navigation state and compute velocities"""
         rx, ry, yaw = pose
@@ -82,9 +87,7 @@ class Navigator:
 
         # Goal reached (no more waypoints)
         if not target:
-            # Clear current path
-            self.path_world = []
-            self.path_idx = 0
+            self.clear_path()
             return 0.0, 0.0, False
         
         # Transform target to robot frame

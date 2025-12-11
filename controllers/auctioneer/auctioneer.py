@@ -1,7 +1,7 @@
 # ============================================= #
 # TASK MANAGER/ AUCTIIONEER   -> ABDUL & ZAHIN  #
 # ==============================================#
-# Supervisor. Spawns rubbish & assigns collection #
+# Spawns rubbish & assigns collection           #
 # to Collector bots by which one is closest     #
 # ============================================= #
 
@@ -35,7 +35,6 @@ DEF TRASH_%d Solid {
     radius 0.05
   }
   physics Physics {
-    density -1
     mass 1
   }
 }
@@ -91,8 +90,6 @@ class SpotterTester(Supervisor):
             for c in range(self.occupancy_grid.width)
             if self.occupancy_grid.is_free(r, c)
         ]
-
-
         num_rubbish = min(10, len(free_cells))
 
         # Pick random distinct free cells
