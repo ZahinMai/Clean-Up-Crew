@@ -129,12 +129,15 @@ You can toggle the allocation logic in `controllers/lib_shared/CONFIG.py`.
 ### Configuration
 
 To change the auction strategy, edit `controllers/lib_shared/CONFIG.py`:
+(Note: bidding strategy yet to be implemented)
 
 ```python
 # Options: "sequential", "nearest_task", "random"
 auction_strategy = "nearest_task"
 ```
 
+## Test logs
+With each simulation run, a text file of the debug output from the console is saved..
 -----
 
 ## File Structure
@@ -154,7 +157,7 @@ Clean-Up-Crew/
 │   │   ├── obstacle_avoidance.py # Simple Reactive Dodge
 │   │   └── map_module.py       # Occupancy Grid
 │   └── archive/                # Deprecated components
-│       └── spotter.py          # Legacy visual search robot (v1.0)
+│       └── spotter.py          # Legacy visual search robot & related modules (v1.0)
 └── worlds/
     └── cafetria.wbt            # Simulation Environment
 ```
@@ -163,10 +166,10 @@ Clean-Up-Crew/
 
 ## Contributors
 
-  * **Zahin Maisa:** Project Lead, Architecture, A\* Navigation, Collector FSM.
-  * **Abdullateef Vahora:** Supervisor/Auctioneer Logic, Legacy Vision System.
-  * **Ajinkya:** World Design, Dynamic Obstacle (Human Agent).
-  * **Kunal:** Communication Protocol, Documentation.
+  * **Zahin Maisa:** Architecture, A\* Navigation, Task Allocation System, Auctioneer Supervisor, Collector FSM.
+  * **Abdullateef Vahora:** Supervisor Legacy Vision System.
+  * **Ajinkya:** World Design, Dynamic Obstacle and Human Agent
+  * **Kunal:** Communication Protocol
 
 -----
 
