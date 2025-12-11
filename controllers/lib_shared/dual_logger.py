@@ -1,12 +1,11 @@
 # =============================================================================
-# DUAL LOGGER - Captures console output & saves as md eport    -> Author: Zahin
+# DUAL LOGGER - Captures console output & saves as md report   -> Author: Zahin
 # =============================================================================
 # Usage:
-#   logger = DualLogger(prefix="robot_1")
-#   logger.start()
-#   print("This gets logged")
+#   logger = Logger(prefix="robot_1")
+#   logger.start("output.md")
+#   logger.write("This gets logged")
 #   logger.stop()
-#   logger.save("logs/report.md")
 # =============================================================================
 import sys, datetime, os
 
@@ -18,6 +17,8 @@ class Logger:
         self.terminal = sys.stdout
         self.log = []
         self.original_stdout = None
+        self.filename = None
+        self.saved = False  # Track if we've already saved
     
     def write(self, message):
         """Write message to both console and memory."""
@@ -31,8 +32,15 @@ class Logger:
         if self.enabled:
             self.log.append(prefixed)
     
-    def start(self):
+    def flush(self):
+        """Flush the output stream (required for stdout compatibility)."""
+        if hasattr(self.terminal, 'flush'):
+            self.terminal.flush()
+    
+    def start(self, filename=None):
         """Start capturing stdout."""
+        self.filename = filename
+        self.saved = False
         self.original_stdout = sys.stdout
         sys.stdout = self
     
@@ -40,19 +48,31 @@ class Logger:
         """Stop capturing stdout and restore original."""
         if self.original_stdout:
             sys.stdout = self.original_stdout
-        self.save()
+            self.original_stdout = None  # Prevent calling stop() twice
+            self.save()
     
     def save(self):
         """Save captured log to file."""
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        os.makedirs("logs", exist_ok=True) # Ensure logs folder exists for controller
-        filename = os.path.join("logs", f"report_{timestamp}.md")
+        # Don't save if already saved or log is empty
+        if self.saved or not self.log:
+            return None
+        
+        os.makedirs("logs", exist_ok=True)
+        
+        if not self.filename:
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = os.path.join("logs", f"report_{timestamp}.md")
+        else:
+            filename = os.path.join("logs", self.filename)
         
         with open(filename, "w", encoding='utf-8') as f:
             f.write("".join(self.log))
         
+        # Restore stdout temporarily to print save message
+        original = sys.stdout
+        sys.stdout = self.terminal
         print(f"Report saved: {filename}")
-        self.log = [] # Clear log
-        return filename
-    
+        sys.stdout = original
         
+        self.saved = True  # Mark as saved
+        return filename

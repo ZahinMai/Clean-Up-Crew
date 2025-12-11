@@ -7,7 +7,7 @@
 # ============================================= #
 
 from controller import Robot
-import math, os, sys
+import math, os, sys, datetime
 
 # ---- Shared Library Import ---- #
 if os.path.dirname(os.path.dirname(__file__)) not in sys.path:
@@ -58,7 +58,8 @@ class Collector(Robot):
 
         # Logging + communication
         self.logger = Logger(prefix=self.robot_id, enabled=True)
-        self.logger.start()
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.logger.start(f"nav_output_{timestamp}.md")
         self.comm = Communication(self, CHANNEL)
 
         # Sensors
@@ -84,7 +85,7 @@ class Collector(Robot):
         self.last_idle_broadcast = 0.0
         self.idle_interval       = 2.0
 
-        print(f"{self.robot_id}: Initialised in IDLE state")
+        self.logger.write(f"{self.robot_id}: Initialised in IDLE state")
 
         # Inform auctioneer immediately (position updates next timestep)
         self.send_idle_status()
@@ -108,7 +109,7 @@ class Collector(Robot):
             "pos": [self.rx, self.ry],
         })
         if sent:
-            print(f"{self.robot_id}: broadcast IDLE ({self.rx:.2f}, {self.ry:.2f})")
+            self.logger.write(f"{self.robot_id}: broadcast IDLE ({self.rx:.2f}, {self.ry:.2f})")
         return sent
 
     # ------------------------------------------------------------------ #
@@ -131,7 +132,7 @@ class Collector(Robot):
             "task_id": task_id,
             "cost": cost,
         })
-        print(f"{self.robot_id}: BID {cost:.2f} for task {task_id}")
+        self.logger.write(f"{self.robot_id}: BID {cost:.2f} for task {task_id}")
 
     def handle_task_assignment(self, msg):
         """Start immediately if idle; else queue for later."""
@@ -143,24 +144,24 @@ class Collector(Robot):
         z = msg.get("target_z")
 
         if None in (task_id, x, z):
-            print(f"{self.robot_id}: Invalid assignment message")
+            self.logger.write(f"{self.robot_id}: Invalid assignment message")
             return
 
         # Start immediately
         if self.state == "IDLE" and self.current_task_id is None:
-            print(f"{self.robot_id}: Assigned task {task_id} (start now)")
+            self.logger.write(f"{self.robot_id}: Assigned task {task_id} (start now)")
             self.current_task_id = task_id
 
             if self.nav.plan_path((self.rx, self.ry), (x, z)):
                 self.state = "NAVIGATING"
-                print(f"{self.robot_id}: Path planned -> NAVIGATING")
+                self.logger.write(f"{self.robot_id}: Path planned -> NAVIGATING")
             else:
-                print(f"{self.robot_id}: Failed to plan path for task {task_id}")
+                self.logger.write(f"{self.robot_id}: Failed to plan path for task {task_id}")
                 self.current_task_id = None
             return
 
         # Else queue it
-        print(f"{self.robot_id}: Queued task {task_id}")
+        self.logger.write(f"{self.robot_id}: Queued task {task_id}")
         self.pending_tasks.append((task_id, x, z))
 
     def handle_messages(self):
@@ -182,24 +183,24 @@ class Collector(Robot):
             self.nav.clear_path()
             self.send_idle_status()
             self.last_idle_broadcast = self.getTime()
-            print(f"{self.robot_id}: Queue empty â†’ IDLE")
+            self.logger.write(f"{self.robot_id}: Queue empty â†’ IDLE")
             return
 
         task_id, x, z = self.pending_tasks.pop(0)
-        print(f"{self.robot_id}: Starting queued task {task_id}")
+        self.logger.write(f"{self.robot_id}: Starting queued task {task_id}")
 
         self.current_task_id = task_id
         if self.nav.plan_path((self.rx, self.ry), (x, z)):
             self.state = "NAVIGATING"
         else:
-            print(f"{self.robot_id}: Failed to plan queued task {task_id}")
+            self.logger.write(f"{self.robot_id}: Failed to plan queued task {task_id}")
             self._start_next_task_if_any()  # try next one
 
     # ------------------------------------------------------------------ #
     # Main Loop
     # ------------------------------------------------------------------ #
     def run(self):
-        print(f"\nCollector Started | Mode: Auction-Based\n")
+        self.logger.write(f"\nCollector Started | Mode: Auction-Based\n")
 
         try:
             while self.step(self.timestep) != -1:
@@ -236,7 +237,7 @@ class Collector(Robot):
                     self.rm.setVelocity(wr)
 
                     if not moving:
-                        print(f"{self.robot_id}: Task {self.current_task_id} COMPLETE")
+                        self.logger.write(f"{self.robot_id}: Task {self.current_task_id} COMPLETE")
 
                         # stop
                         self.lm.setVelocity(0.0)

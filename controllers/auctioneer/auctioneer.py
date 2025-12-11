@@ -1,13 +1,13 @@
 # ============================================= #
-# TASK MANAGER / AUCTIONEER   -> ABDUL & ZAHIN  #
+# TASK MANAGER / AUCTIONEER              ZAHIN  #
 # ============================================= #
 # Spawns rubbish & assigns collection           #
 # to Collector bots via a simple auction        #
 # ============================================= #
 
 from controller import Supervisor
-import json, sys, os
-from random import uniform, sample
+import json, sys, os, datetime
+from random import sample
 
 # ---- To Import Shared Libraries ---- #
 if os.path.dirname(os.path.dirname(__file__)) not in sys.path:
@@ -48,9 +48,8 @@ DEF TRASH_%d Solid {
 }
 """
 
-class SpotterTester(Supervisor):
+class Auctioneer(Supervisor):
     """Supervisor that manages trash tasks and auctions them to collectors."""
-
     def __init__(self):
         super().__init__()
 
@@ -58,10 +57,15 @@ class SpotterTester(Supervisor):
 
         # Logging
         self.logger = Logger(prefix="auctioneer", enabled=True)
-        self.logger.start()
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.logger.start(f"auction_output_{timestamp}.md")
 
         # Map (if needed for spawn logic / visualisation)
         self.occupancy_grid = get_map()
+
+        # Timing
+        self.start_time = None  # When first auction starts
+        self.end_time = None    # When all tasks completed
 
         # Communication devices
         self.receiver = self.getDevice("receiver")
@@ -83,13 +87,10 @@ class SpotterTester(Supervisor):
         self.auction_start_time = 0.0
         self.bids_received = {}  # task_id -> list[(collector_id, cost)]
 
-        # Collector state (for nearest-task strategy)
-        # collector_id -> (x, z)
+        # Collector state (for nearest-task strategy), collector_id -> (x, z)
         self.collector_positions = {}
 
-        print("Auctioneer initialised")
-        
-        # CRITICAL FIX: Spawn rubbish during initialization
+        self.logger.write("Auctioneer initialised\n")
         self.spawn_rubbish()
 
     # -------------------------------------------------------------------------
@@ -97,7 +98,7 @@ class SpotterTester(Supervisor):
     # -------------------------------------------------------------------------
     def spawn_rubbish(self):
         """Spawns rubbish only on free cells in the occupancy grid."""
-        print("Spawning rubbish...")
+        self.logger.write("Spawning rubbish...\n")
 
         # Collect all free cells from the grid
         free_cells = [
@@ -129,7 +130,7 @@ class SpotterTester(Supervisor):
             trash_str = TRASH_TEMPLATE % (i, x, y)
             self.root_children.importMFNodeFromString(-1, trash_str)
         
-        print(f"Spawned {num_rubbish} rubbish items")
+        self.logger.write(f"Spawned {num_rubbish} rubbish items\n")
             
     def remove_trash(self, task_id):
         """Removes the rubbish associated with the given task ID."""
@@ -138,9 +139,9 @@ class SpotterTester(Supervisor):
         
         if trash_node:
             trash_node.remove()
-            print(f"Deleted object: {node_def}")
+            self.logger.write(f"Deleted object: {node_def}\n")
         else:
-            print(f"Warning: Could not find {node_def} to delete.")
+            self.logger.write(f"Warning: Could not find {node_def} to delete.\n")
 
     # -------------------------------------------------------------------------
     # COMMUNICATION
@@ -155,14 +156,13 @@ class SpotterTester(Supervisor):
             try:
                 msgs.append(json.loads(self.receiver.getString()))
             except Exception as e:
-                print(f"[AUCTIONEER] Failed to decode message: {e}")
+                self.logger.write(f"[AUCTIONEER] Failed to decode message: {e}\n")
             self.receiver.nextPacket()
         return msgs
 
     # -------------------------------------------------------------------------
     # AUCTION STRATEGY: NEXT TASK SELECTION
     # -------------------------------------------------------------------------
-
     def select_next_task(self):
         """ Decide which task_id to auction next, based on AUCTION_STRATEGY """
         n_tasks = len(self.trash_locations)
@@ -244,8 +244,8 @@ class SpotterTester(Supervisor):
             return
 
         self.bids_received.setdefault(task_id, []).append((collector_id, cost))
-        msg_str = f"-> BID {collector_id}: {cost:.2f} for task {task_id}"
-        print(msg_str)
+        msg_str = f"-> BID {collector_id}: {cost:.2f} for task {task_id}\n"
+        self.logger.write(msg_str)
 
     def handle_collected(self, msg):
         collector_id = msg.get("collector_id")
@@ -259,7 +259,7 @@ class SpotterTester(Supervisor):
             return
 
         msg_str = f"OK {collector_id} COMPLETED task {task_id}"
-        print(msg_str)
+        self.logger.write(msg_str)
 
         self.completed_task_ids.add(task_id)
         # Once completed, it's no longer "assigned"
@@ -270,29 +270,38 @@ class SpotterTester(Supervisor):
 
         # Check for termination
         if len(self.completed_task_ids) >= len(self.trash_locations):
-            print("=" * 70)
-            print("ALL TASKS COMPLETED. SAVING LOGS & EXITING.")
-            print("=" * 70)
+            elapsed_time = self.getTime() - self.start_time
+            self.logger.write("=" * 70 + "\n")
+            self.logger.write(f"CONFIG: {AUCTION_STRATEGY} Time Elapsed: {elapsed_time}\n")
+            self.logger.write("=" * 70 + "\n")
+            self.logger.write("=" * 70 + "\n")
+            self.logger.write("ALL TASKS COMPLETED. SAVING LOGS & EXITING.\n")
+            self.logger.write("=" * 70 + "\n")
             self.logger.stop()
-            sys.exit(0)
-
+            # Reset & pause simulation
+            self.simulationReset()
+            self.simulationSetMode(self.SIMULATION_MODE_PAUSE)
     # -------------------------------------------------------------------------
     # AUCTION LIFECYCLE
     # -------------------------------------------------------------------------
 
     def start_auction(self):
-        """
-        Start a new auction for a selected task according to AUCTION_STRATEGY.
-        """
+        """ Start a new auction for a selected task according to AUCTION_STRATEGY"""
         task_id = self.select_next_task()
         if task_id is None:
             return
 
         x, z, name = self.trash_locations[task_id]
         self.bids_received[task_id] = []
-
-        print("-" * 50)
-        print(f"**AUCTION #{task_id}**: {name} at ({x:.2f}, {z:.2f})")
+        
+        # Record start time on first auction ONLY
+        if self.start_time is None:
+            self.start_time = self.getTime()
+            self.logger.write(f"TIMER START: {self.start_time:.2f}s")
+        
+        self.logger.write("-" * 50)
+        self.logger.write('\n')
+        self.logger.write(f"**AUCTION #{task_id}**: {name} at ({x:.2f}, {z:.2f})\n")
 
         self.send_message({
             "event": "auction_start",
@@ -306,9 +315,7 @@ class SpotterTester(Supervisor):
         # Mark as assigned once we actually give it to someone in finish_auction_if_ready
 
     def finish_auction_if_ready(self, wait_time=AUCTION_WAIT_TIME):
-        """
-        Close auction if wait_time elapsed and assign the task to the best bidder.
-        """
+        """ Close auction if wait_time elapsed and assign the task to the best bidder """
         if not self.auction_active or self.active_task_id is None:
             return
 
@@ -319,12 +326,12 @@ class SpotterTester(Supervisor):
         bids = self.bids_received.get(task_id, [])
 
         if not bids:
-            print(f"Auction #{task_id} FAILED: No bids.")
+            self.logger.write(f"Auction #{task_id} FAILED: No bids.\n")
             # On failure we simply leave task unassigned; it will be picked up
             # by a future call to start_auction() when someone idles.
         else:
             winner_id, winner_cost = min(bids, key=lambda x: x[1])
-            print(f"Winner: {winner_id} (cost: {winner_cost:.2f})")
+            self.logger.write(f"Winner: {winner_id} (cost: {winner_cost:.2f})")
 
             target_x, target_z, _ = self.trash_locations[task_id]
 
@@ -354,7 +361,7 @@ class SpotterTester(Supervisor):
     # -------------------------------------------------------------------------
 
     def run(self):
-        print("Auctioneer running...")
+        self.logger.write("Auctioneer running...\n")
         try:
             while self.step(self.timestep) != -1:
                 for msg in self.receive_messages():
@@ -373,4 +380,4 @@ class SpotterTester(Supervisor):
 
 
 if __name__ == "__main__":
-    SpotterTester().run()
+    Auctioneer().run()
