@@ -1,8 +1,6 @@
 # ============================================= #
-# TASK MANAGER / AUCTIONEER           -> ZAHIN  #
+# TASK MANAGER / AUCTIONEER   -> ABDUL & ZAHIN  #
 # ============================================= #
-# TASK MANAGER/ AUCTIONEER   -> ABDUL & ZAHIN   #
-# ==============================================#
 # Spawns rubbish & assigns collection           #
 # to Collector bots via a simple auction        #
 # ============================================= #
@@ -19,21 +17,14 @@ from lib_shared.dual_logger import Logger
 from lib_shared.map_module import get_map
 from lib_shared.CONFIG import auction_strategy
 
-# =========================================================
-# Auction strategy:
-# =========================================================
-# "sequential"   -> lowest unused task_id first
-# "nearest_task" -> task closest to any known collector pos
-# "random"       -> random unassigned, uncompleted task
-# =========================================================
-AUCTION_STRATEGY = auction_strategy
+
+AUCTION_STRATEGY = auction_strategy # set in CONFIG.py
 
 # How long to wait for bids before closing an auction
 AUCTION_WAIT_TIME = 2.0 # in seconds
 
-# --- rubbish DEFINITION ---
-RUBBISH_TEMPLATE = """
-DEF RUBBISH_%d Solid {
+TRASH_TEMPLATE = """
+DEF TRASH_%d Solid {
   translation %f %f 0.1
   children [
     Shape {
@@ -99,54 +90,7 @@ class SpotterTester(Supervisor):
         print("Auctioneer initialised")
         
         # CRITICAL FIX: Spawn rubbish during initialization
-        self.auction_queued = False
-        
-        self.bids_received = {} 
-        self.completed_task_ids = set()
-
-        # Test Locations (X, Y/Z, Name)
-        self.rubbish_locations = []
-        self.location_index = 0
-
-        self.setup = "AUCTION" # Default
-        self_node = self.getFromDef("auctioneer")
-        if self_node:
-            data = self_node.getField("customData").getSFString()
-            if "SETUP:COVERAGE" in data:
-                self.setup = "COVERAGE"
-            elif "SETUP:AUCTION" in data:
-                self.setup = "AUCTION"
-
-        print(f"INITIALIZING IN {self.setup} SETUP")
-
-        # --- SPAWN rubbish ---
-        self.root_children = self.getRoot().getField("children")
         self.spawn_rubbish()
-
-        # Broadcast Setup immediately after spawn
-        self.broadcast_setup()
-
-        print("SUPERVISOR STARTED")
-
-    # -------------------------------------------------------------------------
-    # CONFIGURATION BROADCAST
-    # -------------------------------------------------------------------------
-    def broadcast_setup(self):
-        """Sends the current setup and full rubbish list to all collectors for the coverage setup."""
-        clean_list = []
-        for i, (x, y, _) in enumerate(self.rubbish_locations):
-            clean_list.append({"id": i, "x": x, "y": y})
-
-        msg = {
-            "event": "configure",
-            "setup": self.setup,
-            "rubbish_list": clean_list
-        }
-
-        # Send multiple times to ensure collectors wake up and receive it
-        for _ in range(5):
-            self.send_message(msg)
-            self.step(self.timestep)
 
     # -------------------------------------------------------------------------
     # TRASH INITIALISATION / CLEANUP (stubbed hooks)
@@ -163,6 +107,7 @@ class SpotterTester(Supervisor):
             if self.occupancy_grid.is_free(r, c)
         ]
 
+
         num_rubbish = min(10, len(free_cells))
 
         # Pick random distinct free cells
@@ -173,28 +118,26 @@ class SpotterTester(Supervisor):
             x, y = self.occupancy_grid.grid_to_world(row, col)
 
             # Track this rubbish location
-            self.rubbish_locations.append((x, y, f"rubbish at ({x}, {y})"))
+            self.trash_locations.append((x, y, f"rubbish at ({x}, {y})"))
 
             # Remove any existing object with this DEF, just like before
-            existing_node = self.getFromDef(f"RUBBISH_{i}")
+            existing_node = self.getFromDef(f"TRASH_{i}")
             if existing_node:
                 existing_node.remove()
 
             # Spawn the rubbish at the chosen free cell
-            rubbish_str = RUBBISH_TEMPLATE % (i, x, y)
-            self.root_children.importMFNodeFromString(-1, rubbish_str)
             trash_str = TRASH_TEMPLATE % (i, x, y)
             self.root_children.importMFNodeFromString(-1, trash_str)
         
         print(f"Spawned {num_rubbish} rubbish items")
             
-    def remove_rubbish(self, task_id):
+    def remove_trash(self, task_id):
         """Removes the rubbish associated with the given task ID."""
-        node_def = f"RUBBISH_{task_id}"
-        rubbish_node = self.getFromDef(node_def)
+        node_def = f"TRASH_{task_id}"
+        trash_node = self.getFromDef(node_def)
         
-        if rubbish_node:
-            rubbish_node.remove()
+        if trash_node:
+            trash_node.remove()
             print(f"Deleted object: {node_def}")
         else:
             print(f"Warning: Could not find {node_def} to delete.")
@@ -262,10 +205,12 @@ class SpotterTester(Supervisor):
         return min(available_ids)
 
     # -------------------------------------------------------------------------
-    # MESSAGE HANDLERS
+    # HANDLERS
     # -------------------------------------------------------------------------
+
     def handle_idle(self, msg):
-        """ Handle 'idle' messages from collectors.
+        """
+        Handle 'idle' messages from collectors.
         - Updates collector position cache.
         - Triggers an auction if needed and tasks remain.
         """
@@ -279,10 +224,6 @@ class SpotterTester(Supervisor):
         # Stop if all tasks done
         if len(self.completed_task_ids) >= len(self.trash_locations):
             return
-        if len(self.completed_task_ids) >= len(self.rubbish_locations): return
-
-        # In COVERAGE setup, collectors are running their coverage pattern.
-        if self.setup == "COVERAGE": return
 
         # Queue logic: if an auction is ongoing, mark that we should
         # start another once it finishes; otherwise start immediately.
@@ -292,8 +233,6 @@ class SpotterTester(Supervisor):
             self.start_auction()
 
     def handle_bid(self, msg):
-        if self.setup == "COVERAGE": return # Ignore bids in coverage mode
-
         collector_id = msg.get("collector_id")
         task_id = msg.get("task_id")
         cost = msg.get("cost")
@@ -327,14 +266,11 @@ class SpotterTester(Supervisor):
         if task_id in self.assigned_task_ids:
             self.assigned_task_ids.remove(task_id)
 
-        self.remove_rubbish(task_id)
+        self.remove_trash(task_id)
 
         # Check for termination
         if len(self.completed_task_ids) >= len(self.trash_locations):
             print("=" * 70)
-        # Check for Termination
-        if len(self.completed_task_ids) >= len(self.rubbish_locations):
-            print("="*70)
             print("ALL TASKS COMPLETED. SAVING LOGS & EXITING.")
             print("=" * 70)
             self.logger.stop()
@@ -350,17 +286,9 @@ class SpotterTester(Supervisor):
         """
         task_id = self.select_next_task()
         if task_id is None:
-        # If no more rubbish to collect, exit
-        if self.location_index >= len(self.rubbish_locations):
             return
 
         x, z, name = self.trash_locations[task_id]
-        
-        # Else get next rubbish location
-        x, z, name = self.rubbish_locations[self.location_index]
-        task_id = self.location_index
-        
-        self.location_index += 1
         self.bids_received[task_id] = []
 
         print("-" * 50)
@@ -378,7 +306,9 @@ class SpotterTester(Supervisor):
         # Mark as assigned once we actually give it to someone in finish_auction_if_ready
 
     def finish_auction_if_ready(self, wait_time=AUCTION_WAIT_TIME):
-        """ Close auction if wait_time elapsed and assign the task to the best bidder """
+        """
+        Close auction if wait_time elapsed and assign the task to the best bidder.
+        """
         if not self.auction_active or self.active_task_id is None:
             return
 
@@ -390,15 +320,13 @@ class SpotterTester(Supervisor):
 
         if not bids:
             print(f"Auction #{task_id} FAILED: No bids.")
-            # On failure, just leave task unassigned; it will be picked up
-            # by a future call to start_auction() when a collector is free
+            # On failure we simply leave task unassigned; it will be picked up
+            # by a future call to start_auction() when someone idles.
         else:
             winner_id, winner_cost = min(bids, key=lambda x: x[1])
             print(f"Winner: {winner_id} (cost: {winner_cost:.2f})")
 
             target_x, target_z, _ = self.trash_locations[task_id]
-            
-            target_x, target_z, _ = self.rubbish_locations[task_id]
 
             self.send_message({
                 "event": "assign_task",
@@ -437,19 +365,6 @@ class SpotterTester(Supervisor):
                         self.handle_bid(msg)
                     elif event == "collected":
                         self.handle_collected(msg)
-        while self.step(self.timestep) != -1:
-            # Re-broadcast setup periodically 
-            if self.getTime() % 5.0 < (self.timestep / 1000.0):
-                 self.broadcast_setup()
-
-            for msg in self.receive_messages():
-                event = msg.get("event")
-                if event == "idle":
-                    self.handle_idle(msg)
-                elif event == "bid":
-                    self.handle_bid(msg)
-                elif event == "collected":
-                    self.handle_collected(msg)
 
                 self.finish_auction_if_ready()
 

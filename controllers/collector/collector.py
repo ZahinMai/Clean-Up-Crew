@@ -2,14 +2,14 @@
 #  COLLECTOR FSM              -> AUTHOR: ZAHIN  #
 # ============================================= #
 # Collector robot: bids while moving, executes  #
-# tasks FIFO, reports idle + position for        #
-# auctioneer’s allocation strategies.           #
+# tasks FIFO, reports idle + position for       #
+# auctioneer's allocation strategies.         #
 # ============================================= #
 
 from controller import Robot
 import math, os, sys
 
-# ---- To Import Shared Libraries ---- #
+# ---- Shared Library Import ---- #
 if os.path.dirname(os.path.dirname(__file__)) not in sys.path:
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -17,26 +17,26 @@ from lib_shared.communication import Communication
 from lib_shared.navigation import Navigator
 from lib_shared.dual_logger import Logger
 
-from collector_coverage import run_coverage_setup
-
-# =============================================================================
-# CONFIGURATION
-# =============================================================================
+# ----------------------------------------------------------------------
+# Config
+# ----------------------------------------------------------------------
 WHEEL_RADIUS = 0.033
-AXLE_LENGTH = 0.16
-CHANNEL = 1
+AXLE_LENGTH  = 0.16
+CHANNEL      = 1
 
 def get_lidar_points(lidar, max_r=3.5, min_r=0.1):
-    """Return filtered (x, y) lidar points in robot frame."""
-    if not lidar: return []
-    try: ranges = lidar.getRangeImage()
-    except Exception: return []
-    if not ranges: return []
-
+    if not lidar:
+        return []
+    try:
+        ranges = lidar.getRangeImage()
+    except Exception:
+        return []
+    if not ranges:
+        return []
     fov, n = lidar.getFov(), len(ranges)
     return [
-        (r * math.cos(-fov / 2 + i / (n - 1) * fov),
-         r * math.sin(-fov / 2 + i / (n - 1) * fov))
+        (r * math.cos(-fov/2 + i/(n-1)*fov),
+         r * math.sin(-fov/2 + i/(n-1)*fov))
         for i, r in enumerate(ranges)
         if min_r <= r <= max_r and math.isfinite(r)
     ]
@@ -45,8 +45,8 @@ def get_lidar_points(lidar, max_r=3.5, min_r=0.1):
 # COLLECTOR ROBOT
 # =============================================================================
 class Collector(Robot):
-    """Auction-based collector robot with A* navigation."""
-    
+    """Auction-based collector robot with A* navigation and FIFO task queue."""
+
     def __init__(self):
         super().__init__()
 
@@ -82,9 +82,9 @@ class Collector(Robot):
 
         # Idle heartbeat
         self.last_idle_broadcast = 0.0
-        self.idle_interval       = 1.0
+        self.idle_interval       = 2.0
 
-        print(f"{self.robot_id}: Initialised - Waiting for Setup...")
+        print(f"{self.robot_id}: Initialised in IDLE state")
 
         # Inform auctioneer immediately (position updates next timestep)
         self.send_idle_status()
@@ -111,9 +111,9 @@ class Collector(Robot):
             print(f"{self.robot_id}: broadcast IDLE ({self.rx:.2f}, {self.ry:.2f})")
         return sent
 
-    # ---------------------------------------------------------------------- #
-    # Auction handling                                                       #
-    # ---------------------------------------------------------------------- #
+    # ------------------------------------------------------------------ #
+    # Auction Handling
+    # ------------------------------------------------------------------ #
     def handle_auction_start(self, msg):
         """Robots always bid; auctioneer decides assignment."""
         task_id = msg.get("task_id")
@@ -182,7 +182,7 @@ class Collector(Robot):
             self.nav.clear_path()
             self.send_idle_status()
             self.last_idle_broadcast = self.getTime()
-            print(f"{self.robot_id}: Queue empty → IDLE")
+            print(f"{self.robot_id}: Queue empty â†’ IDLE")
             return
 
         task_id, x, z = self.pending_tasks.pop(0)
@@ -199,16 +199,6 @@ class Collector(Robot):
     # Main Loop
     # ------------------------------------------------------------------ #
     def run(self):
-        setup_mode, rubbish_list = self.wait_for_setup()
-
-        if setup_mode == "COVERAGE":
-            try:
-                run_coverage_setup(self, rubbish_list)
-            finally:
-                self.logger.stop()
-            return
-
-        # ELSE: Default Auction Logic
         print(f"\nCollector Started | Mode: Auction-Based\n")
 
         try:

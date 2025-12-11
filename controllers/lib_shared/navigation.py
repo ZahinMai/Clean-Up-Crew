@@ -105,7 +105,7 @@ class Navigator:
                 min_obstacle_dist = min(min_obstacle_dist, dist)
         
         # Thresholds for behavior switching
-        DANGER_ZONE = 0.1      # meters - stop forward motion
+        DANGER_ZONE = 0.05      # meters - stop forward motion
         CAUTION_ZONE = 0.2     # meters - slow down significantly
         SLOW_ZONE = 0.3        # meters - reduce speed
         
@@ -147,7 +147,7 @@ class Navigator:
         
         # Optional: Boost angular velocity in danger zone for faster turning
         if min_obstacle_dist < DANGER_ZONE and obstacle_in_front:
-            w = w * 1.5  # Turn faster when stopped
+            w *= 2  # Turn faster when stopped
             w = max(-self.max_w, min(self.max_w, w))  # Re-clamp
         
         return v, w, True
