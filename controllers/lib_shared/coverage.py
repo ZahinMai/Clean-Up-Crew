@@ -8,7 +8,7 @@ class CoveragePlanner:
     Decomposes the occupancy grid into distinct rectangular zones, generates a 
     lawnmower path for each zone, and joins them into a complete coverage path.
     """
-    def __init__(self, grid_obj, step: int):
+    def __init__(self, grid_obj, step=16):
         self.grid = grid_obj
         self.step = step
         self.working_grid = [row[:] for row in self.grid.grid] # Copy of the grid (0=Free, 1=Obstacle, 2=Visited)
@@ -48,6 +48,28 @@ class CoveragePlanner:
         print(f"Mission: {len(final_waypoints)} points.")
         return final_waypoints
     
+    def generate_hardcoded_waypoints(self):
+        """
+        Generates waypoints covering the grid from Top to Bottom with equally spaced waypoints for this specific map.
+        Used as a fallback or simple coverage method.
+        """
+        # Define the grid lines
+        x_cols = [-3.6, -1.2, 1.2, 3.6]
+        y_rows = [5.1, 3.4, 1.7, 0.0, -1.7, -3.4, -5.1]
+        
+        final_waypoints = []
+        
+        # Generate Lawnmower Path (Top to Bottom)
+        for i, y in enumerate(y_rows):
+            if i % 2 == 0:
+                row_points = [(x, y) for x in x_cols]
+            else:
+                row_points = [(x, y) for x in reversed(x_cols)]
+                
+            final_waypoints.extend(row_points)
+            
+        return final_waypoints
+
     def _decompose_grid(self):
         """Iteratively finds the largest valid rectangle of free space starting from top-left."""
         rows = self.grid.height

@@ -4,25 +4,20 @@
 # - Distance-based rubbish detection.
 
 import math
+from lib_shared.coverage import CoveragePlanner
+from lib_shared.map_module import get_map
 
 WHEEL_RADIUS = 0.033
 AXLE_LENGTH = 0.16
 
 # HARDCODED WAYPOINTS 
+grid = get_map()
+coverage_planner = CoveragePlanner(grid)
+mission_waypoints = coverage_planner.generate_hardcoded_waypoints()
 
-COVERAGE_WAYPOINTS = { # TODO
-    "collector_1": [
-        (2.5, -0.5), (2.5, 3.5), # Right Aisle Up
-        (0.0, 3.5),  (0.0, -0.5), # Center Aisle Down
-        (-2.5, -0.5), (-2.5, 3.5), # Left Aisle Up
-        (0.0, 0.0) # Return to center-ish
-    ],
-    "collector_2": [
-        (2.5, -1.5), (2.5, -5.0), # Right Aisle Down
-        (0.0, -5.0), (0.0, -1.5), # Center Aisle Up
-        (-2.5, -1.5), (-2.5, -5.0), # Left Aisle Down
-        (0.0, -3.0) # Return to center-ish
-    ]
+collector_waypoints = { # TODO
+    "collector_1": mission_waypoints[-13:], # Last 13 waypoints i.e bottom half
+    "collector_2": list(reversed(mission_waypoints[:13])), # First 13 waypoints reversed i.e top half
 }
 
 def get_lidar_points(lidar, max_r=3.5, min_r=0.1): # TODO
@@ -42,8 +37,7 @@ def get_lidar_points(lidar, max_r=3.5, min_r=0.1): # TODO
 
 def run_coverage_setup(robot, rubbish_list):
     print(f"{robot.robot_id}: Starting COVERAGE mode logic.")
-    
-    waypoints = COVERAGE_WAYPOINTS.get(robot.robot_id, COVERAGE_WAYPOINTS["collector_1"]) # TODO
+    waypoints = collector_waypoints[robot.robot_id]
     current_wp_idx = 0
     
     if waypoints:
