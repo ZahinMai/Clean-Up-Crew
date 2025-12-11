@@ -1,9 +1,11 @@
 # ============================================= #
 #  COLLECTOR FSM              -> AUTHOR: ZAHIN  #
 # ============================================= #
-# Controller for Collector bots in task auction #
-# config. Bid on tasks & navigate with A*       #
+# Collector robot: bids while moving, executes  #
+# tasks FIFO, reports idle + position for        #
+# auctioneer’s allocation strategies.           #
 # ============================================= #
+
 from controller import Robot
 import math, os, sys
 
@@ -46,94 +48,79 @@ class Collector(Robot):
     def __init__(self):
         super().__init__()
 
-        # Basic setup
-        self.timestep = int(self.getBasicTimeStep())
-        self.robot_id = self.getName()
-        self.state = "IDLE"  # "IDLE" or "NAVIGATING"
+        self.timestep    = int(self.getBasicTimeStep())
+        self.robot_id    = self.getName()
+        self.state       = "IDLE"      # or "NAVIGATING"
+        self.current_task_id = None
+        self.pending_tasks   = []      # FIFO queue of (task_id, x, z)
 
-        # Setup Position Logging & Comm
+        # Logging + communication
         self.logger = Logger(prefix=self.robot_id, enabled=True)
         self.logger.start()
         self.comm = Communication(self, CHANNEL)
 
-        # ------ Sensor & Actuator Setup ------ #
-        self.gps = self.getDevice('gps')
-        self.gps.enable(self.timestep)
-
-        self.imu = self.getDevice('inertial unit')
-        self.imu.enable(self.timestep)
-
+        # Sensors
+        self.gps  = self.getDevice('gps'); self.gps.enable(self.timestep)
+        self.imu  = self.getDevice('inertial unit'); self.imu.enable(self.timestep)
         self.lidar = self.getDevice('LDS-01')
-        self.lidar.enable(self.timestep)
-        self.lidar.enablePointCloud()
+        self.lidar.enable(self.timestep); self.lidar.enablePointCloud()
 
+        # Motors
         self.lm = self.getDevice('left wheel motor')
-        self.lm.setPosition(float('inf'))
-        self.lm.setVelocity(0.0)
-
         self.rm = self.getDevice('right wheel motor')
-        self.rm.setPosition(float('inf'))
-        self.rm.setVelocity(0.0)
+        for m in (self.lm, self.rm):
+            m.setPosition(float('inf'))
+            m.setVelocity(0.0)
 
-        # ---------- Navigation Setup ---------- #
+        # Navigation
         self.nav = Navigator(map_inflation=1)
-        self.current_task_id = None
 
-        # Pose cache (world frame)
-        self.rx = 0.0
-        self.ry = 0.0
-        self.yaw = 0.0
+        # Pose cache
+        self.rx = self.ry = self.yaw = 0.0
 
-        # Idle heartbeat timing
+        # Idle heartbeat
         self.last_idle_broadcast = 0.0
-        self.idle_interval = 1.0  # seconds
+        self.idle_interval       = 1.0
 
         print(f"{self.robot_id}: Initialised in IDLE state")
 
-        # Send initial IDLE immediately so auctioneer knows we exist
-        # (position will be updated after first sensor step)
+        # Inform auctioneer immediately (position updates next timestep)
         self.send_idle_status()
         self.last_idle_broadcast = self.getTime()
 
-    # ---------------------------------------------------------------------- #
-    # Pose & messaging                                                       #
-    # ---------------------------------------------------------------------- #
+    # ------------------------------------------------------------------ #
+    # Pose update & idle broadcast
+    # ------------------------------------------------------------------ #
     def update_pose(self):
-        """Update robot pose from sensors (x,y on ground plane)."""
         if self.gps.getSamplingPeriod() > 0:
             x, y, _ = self.gps.getValues()
             self.rx, self.ry = x, y
-
         if self.imu.getSamplingPeriod() > 0:
             self.yaw = self.imu.getRollPitchYaw()[2]
 
     def send_idle_status(self):
-        """Broadcast idle state and current location (heartbeat)."""
-        ok = self.comm.send({
+        """Broadcast idle state + position so auctioneer can pick next task."""
+        sent = self.comm.send({
             "event": "idle",
             "collector_id": self.robot_id,
             "pos": [self.rx, self.ry],
         })
-        if ok:
-            print(f"{self.robot_id}: broadcast IDLE at ({self.rx:.2f}, {self.ry:.2f})")
-        else:
-            print(f"{self.robot_id}: FAILED to broadcast IDLE")
-        return ok
+        if sent:
+            print(f"{self.robot_id}: broadcast IDLE ({self.rx:.2f}, {self.ry:.2f})")
+        return sent
 
     # ---------------------------------------------------------------------- #
     # Auction handling                                                       #
     # ---------------------------------------------------------------------- #
     def handle_auction_start(self, msg):
-        """Submit bid if currently IDLE."""
-        if self.state != "IDLE":
-            return
-
+        """Robots always bid; auctioneer decides assignment."""
         task_id = msg.get("task_id")
-        pos = msg.get("pos")
+        pos     = msg.get("pos")
         if task_id is None or not pos:
             return
 
         tx, ty = pos
+
         cost = math.hypot(tx - self.rx, ty - self.ry)
 
         self.comm.send({
@@ -145,7 +132,7 @@ class Collector(Robot):
         print(f"{self.robot_id}: BID {cost:.2f} for task {task_id}")
 
     def handle_task_assignment(self, msg):
-        """Accept task and transition to NAVIGATING if this robot is winner."""
+        """Start immediately if idle; else queue for later."""
         if msg.get("collector_id") != self.robot_id:
             return
 
@@ -154,23 +141,27 @@ class Collector(Robot):
         z = msg.get("target_z")
 
         if None in (task_id, x, z):
-            print(f"{self.robot_id}: ERROR – invalid task assignment {msg}")
+            print(f"{self.robot_id}: Invalid assignment message")
             return
 
-        print(f"{self.robot_id}: Assigned task {task_id} → ({x:.2f}, {z:.2f})")
-        self.current_task_id = task_id
+        # Start immediately
+        if self.state == "IDLE" and self.current_task_id is None:
+            print(f"{self.robot_id}: Assigned task {task_id} (start now)")
+            self.current_task_id = task_id
 
-        # Plan a new path; Navigator stores it internally
-        ok = self.nav.plan_path((self.rx, self.ry), (x, z))
-        if ok:
-            self.state = "NAVIGATING"
-            print(f"{self.robot_id}: Path planned, switching to NAVIGATING")
-        else:
-            print(f"{self.robot_id}: Planning failed, remaining IDLE")
-            self.current_task_id = None
+            if self.nav.plan_path((self.rx, self.ry), (x, z)):
+                self.state = "NAVIGATING"
+                print(f"{self.robot_id}: Path planned -> NAVIGATING")
+            else:
+                print(f"{self.robot_id}: Failed to plan path for task {task_id}")
+                self.current_task_id = None
+            return
+
+        # Else queue it
+        print(f"{self.robot_id}: Queued task {task_id}")
+        self.pending_tasks.append((task_id, x, z))
 
     def handle_messages(self):
-        """Process all pending messages from the auctioneer."""
         for msg in self.comm.receive_all():
             event = msg.get("event")
             if event == "auction_start":
@@ -178,9 +169,33 @@ class Collector(Robot):
             elif event == "assign_task":
                 self.handle_task_assignment(msg)
 
-    # ---------------------------------------------------------------------- #
-    # Main loop                                                              #
-    # ---------------------------------------------------------------------- #
+    # ------------------------------------------------------------------ #
+    # Task Chaining
+    # ------------------------------------------------------------------ #
+    def _start_next_task_if_any(self):
+        if not self.pending_tasks:
+            # No more work
+            self.current_task_id = None
+            self.state = "IDLE"
+            self.nav.clear_path()
+            self.send_idle_status()
+            self.last_idle_broadcast = self.getTime()
+            print(f"{self.robot_id}: Queue empty → IDLE")
+            return
+
+        task_id, x, z = self.pending_tasks.pop(0)
+        print(f"{self.robot_id}: Starting queued task {task_id}")
+
+        self.current_task_id = task_id
+        if self.nav.plan_path((self.rx, self.ry), (x, z)):
+            self.state = "NAVIGATING"
+        else:
+            print(f"{self.robot_id}: Failed to plan queued task {task_id}")
+            self._start_next_task_if_any()  # try next one
+
+    # ------------------------------------------------------------------ #
+    # Main Loop
+    # ------------------------------------------------------------------ #
     def run(self):
         print(f"\nCollector Started | Mode: Auction-Based\n")
 
@@ -190,7 +205,6 @@ class Collector(Robot):
                 self.handle_messages()
 
                 if self.state == "IDLE":
-                    # Stop and periodically announce that we are free
                     self.lm.setVelocity(0.0)
                     self.rm.setVelocity(0.0)
 
@@ -203,32 +217,30 @@ class Collector(Robot):
                     now = self.getTime()
                     lidar_pts = get_lidar_points(self.lidar)
 
-                    # Navigator computes (v, w) and whether we are still moving
                     v, w, moving = self.nav.update(
                         pose=(self.rx, self.ry, self.yaw),
                         lidar_pts=lidar_pts,
                         now=now,
                     )
 
-                    wl = (v + 0.5 * w * AXLE_LENGTH) / WHEEL_RADIUS
-                    wr = (v - 0.5 * w * AXLE_LENGTH) / WHEEL_RADIUS
-                    vmax = min(self.lm.getMaxVelocity(), self.rm.getMaxVelocity())
+                    wl = (v + 0.5*w*AXLE_LENGTH) / WHEEL_RADIUS
+                    wr = (v - 0.5*w*AXLE_LENGTH) / WHEEL_RADIUS
 
+                    vmax = min(self.lm.getMaxVelocity(), self.rm.getMaxVelocity())
                     wl = max(-vmax, min(vmax, wl))
                     wr = max(-vmax, min(vmax, wr))
 
                     self.lm.setVelocity(wl)
                     self.rm.setVelocity(wr)
 
-                    # Goal reached: Navigator reports moving == False
                     if not moving:
                         print(f"{self.robot_id}: Task {self.current_task_id} COMPLETE")
 
-                        # 1. Stop motors
+                        # stop
                         self.lm.setVelocity(0.0)
                         self.rm.setVelocity(0.0)
 
-                        # 2. Notify auctioneer / supervisor
+                        # notify auctioneer
                         self.comm.send({
                             "event": "collected",
                             "collector_id": self.robot_id,
@@ -237,14 +249,8 @@ class Collector(Robot):
                             "y": self.ry,
                         })
 
-                        # 3. Reset FSM & clear path
-                        self.current_task_id = None
-                        self.state = "IDLE"
                         self.nav.clear_path()
-
-                        # 4. Immediate idle heartbeat to trigger next auction
-                        self.send_idle_status()
-                        self.last_idle_broadcast = self.getTime()
+                        self._start_next_task_if_any()
 
         finally:
             self.logger.stop()

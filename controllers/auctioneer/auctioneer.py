@@ -1,21 +1,34 @@
 # ============================================= #
-# TASK MANAGER/ AUCTIIONEER   -> ABDUL & ZAHIN  #
-# ==============================================#
+# TASK MANAGER / AUCTIONEER           -> ZAHIN  #
+# ============================================= #
 # Spawns rubbish & assigns collection           #
-# to Collector bots by which one is closest     #
+# to Collector bots via a simple auction        #
 # ============================================= #
 
 from controller import Supervisor
 import json, sys, os
 from random import uniform, sample
 
+# ---- To Import Shared Libraries ---- #
 if os.path.dirname(os.path.dirname(__file__)) not in sys.path:
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from lib_shared.dual_logger import Logger
 from lib_shared.map_module import get_map
+from lib_shared.CONFIG import auction_strategy
 
-# --- rubbish DEFINITION ---
+# =========================================================
+# Auction strategy:
+# =========================================================
+# "sequential"   -> lowest unused task_id first
+# "nearest_task" -> task closest to any known collector pos
+# "random"       -> random unassigned, uncompleted task
+# =========================================================
+AUCTION_STRATEGY = auction_strategy
+
+# How long to wait for bids before closing an auction
+AUCTION_WAIT_TIME = 2.0 # in seconds
+
 TRASH_TEMPLATE = """
 DEF TRASH_%d Solid {
   translation %f %f 0.1
@@ -42,43 +55,51 @@ DEF TRASH_%d Solid {
 """
 
 class SpotterTester(Supervisor):
+    """Supervisor that manages trash tasks and auctions them to collectors."""
+
     def __init__(self):
         super().__init__()
 
-        # Enable logging (writes to file in background)
-        self.logger = Logger(prefix='spotter', enabled=True)
-        self.logger.start()
-        self.occupancy_grid = get_map()
         self.timestep = int(self.getBasicTimeStep())
-        
-        # Comm Setup (Channel 1)
-        self.emitter = self.getDevice('emitter')
-        self.emitter.setChannel(1)
-        self.receiver = self.getDevice('receiver')
-        self.receiver.setChannel(1)
+
+        # Logging
+        self.logger = Logger(prefix="auctioneer", enabled=True)
+        self.logger.start()
+
+        # Map (if needed for spawn logic / visualisation)
+        self.occupancy_grid = get_map()
+
+        # Communication devices
+        self.receiver = self.getDevice("receiver")
         self.receiver.enable(self.timestep)
+        self.emitter = self.getDevice("emitter")
 
-        # State Variables
-        self.active_task_id = None
-        self.auction_active = False
-        self.auction_start_time = 0.0
-        self.auction_queued = False
-        
-        self.bids_received = {} 
-        self.completed_task_ids = set()
-
-        # Test Locations (X, Y/Z, Name)
-        self.trash_locations = []
-        self.location_index = 0
-
-        # --- SPAWN rubbish ---
+        # Get root node for spawning trash
         self.root_children = self.getRoot().getField("children")
+
+        # Task management
+        self.trash_locations =  []
+        self.completed_task_ids = set()
+        self.assigned_task_ids = set()  # tasks auctioned and assigned but not yet completed
+
+        # Auction state
+        self.auction_active = False
+        self.auction_queued = False
+        self.active_task_id = None
+        self.auction_start_time = 0.0
+        self.bids_received = {}  # task_id -> list[(collector_id, cost)]
+
+        # Collector state (for nearest-task strategy)
+        # collector_id -> (x, z)
+        self.collector_positions = {}
+
+        print("Auctioneer initialised")
+        
+        # CRITICAL FIX: Spawn rubbish during initialization
         self.spawn_rubbish()
 
-        print("SPOTTER AUCTION TEST (AUTO) STARTED")
-
     # -------------------------------------------------------------------------
-    # SUPERVISOR METHODS (Spawn/Delete)
+    # TRASH INITIALISATION / CLEANUP (stubbed hooks)
     # -------------------------------------------------------------------------
     def spawn_rubbish(self):
         """Spawns rubbish only on free cells in the occupancy grid."""
@@ -113,6 +134,8 @@ class SpotterTester(Supervisor):
             # Spawn the rubbish at the chosen free cell
             trash_str = TRASH_TEMPLATE % (i, x, y)
             self.root_children.importMFNodeFromString(-1, trash_str)
+        
+        print(f"Spawned {num_rubbish} rubbish items")
             
     def remove_trash(self, task_id):
         """Removes the rubbish associated with the given task ID."""
@@ -132,24 +155,82 @@ class SpotterTester(Supervisor):
         self.emitter.send(json.dumps(msg))
 
     def receive_messages(self):
-        messages = []
+        """Yield all messages received since last step."""
+        msgs = []
         while self.receiver.getQueueLength() > 0:
             try:
-                messages.append(json.loads(self.receiver.getString()))
+                msgs.append(json.loads(self.receiver.getString()))
             except Exception as e:
-                print(f"Parse error: {e}")
-            finally:
-                self.receiver.nextPacket()
-        return messages
+                print(f"[AUCTIONEER] Failed to decode message: {e}")
+            self.receiver.nextPacket()
+        return msgs
 
     # -------------------------------------------------------------------------
-    # HANDLERS
+    # AUCTION STRATEGY: NEXT TASK SELECTION
+    # -------------------------------------------------------------------------
+
+    def select_next_task(self):
+        """ Decide which task_id to auction next, based on AUCTION_STRATEGY """
+        n_tasks = len(self.trash_locations)
+        if len(self.completed_task_ids) >= n_tasks:
+            return None
+
+        # Tasks that are not completed and not currently assigned
+        available_ids = [
+            tid for tid in range(n_tasks)
+            if tid not in self.completed_task_ids and tid not in self.assigned_task_ids
+        ]
+        if not available_ids:
+            return None
+
+        # Strategy: sequential – smallest task_id first
+        if AUCTION_STRATEGY == "sequential":
+            return min(available_ids)
+
+        # Strategy: nearest_task – task closest to any known collector position
+        if AUCTION_STRATEGY == "nearest_task" and self.collector_positions:
+            best_id, best_dist2 = None, float("inf")
+            for tid in available_ids:
+                tx, tz, _ = self.trash_locations[tid]
+                for (cx, cz) in self.collector_positions.values():
+                    dx = tx - cx
+                    dz = tz - cz
+                    d2 = dx * dx + dz * dz
+                    if d2 < best_dist2:
+                        best_dist2 = d2
+                        best_id = tid
+            # Fallback if something went wrong
+            return best_id if best_id is not None else min(available_ids)
+
+        # Strategy: random – pick random available task
+        if AUCTION_STRATEGY == "random":
+            from random import choice
+            return choice(available_ids)
+
+        # Default fallback
+        return min(available_ids)
+
+    # -------------------------------------------------------------------------
+    # MESSAGE HANDLERS
     # -------------------------------------------------------------------------
     def handle_idle(self, msg):
-        # Stop if all tasks done
-        if len(self.completed_task_ids) >= len(self.trash_locations): return
+        """ Handle 'idle' messages from collectors.
+        - Updates collector position cache.
+        - Triggers an auction if needed and tasks remain.
+        """
+        collector_id = msg.get("collector_id")
+        pos = msg.get("pos")
 
-        # Queue logic
+        # Track collector positions for nearest-task strategy
+        if collector_id is not None and pos and len(pos) >= 2:
+            self.collector_positions[collector_id] = (pos[0], pos[1])
+
+        # Stop if all tasks done
+        if len(self.completed_task_ids) >= len(self.trash_locations):
+            return
+
+        # Queue logic: if an auction is ongoing, mark that we should
+        # start another once it finishes; otherwise start immediately.
         if self.auction_active:
             self.auction_queued = True
         else:
@@ -159,10 +240,13 @@ class SpotterTester(Supervisor):
         collector_id = msg.get("collector_id")
         task_id = msg.get("task_id")
         cost = msg.get("cost")
-        
+
         if task_id is None or task_id != self.active_task_id:
             return
-            
+
+        if collector_id is None or cost is None:
+            return
+
         self.bids_received.setdefault(task_id, []).append((collector_id, cost))
         msg_str = f"-> BID {collector_id}: {cost:.2f} for task {task_id}"
         print(msg_str)
@@ -170,39 +254,45 @@ class SpotterTester(Supervisor):
     def handle_collected(self, msg):
         collector_id = msg.get("collector_id")
         task_id = msg.get("task_id")
-        
+
+        if task_id is None:
+            return
+
         # Idempotency check
         if task_id in self.completed_task_ids:
             return
-            
+
         msg_str = f"OK {collector_id} COMPLETED task {task_id}"
         print(msg_str)
-        
+
         self.completed_task_ids.add(task_id)
+        # Once completed, it's no longer "assigned"
+        if task_id in self.assigned_task_ids:
+            self.assigned_task_ids.remove(task_id)
 
         self.remove_trash(task_id)
 
-        # Check for Termination
+        # Check for termination
         if len(self.completed_task_ids) >= len(self.trash_locations):
-            print("="*70)
+            print("=" * 70)
             print("ALL TASKS COMPLETED. SAVING LOGS & EXITING.")
-            print("="*70)
+            print("=" * 70)
             self.logger.stop()
             sys.exit(0)
 
     # -------------------------------------------------------------------------
-    # AUCTION LOGIC
+    # AUCTION LIFECYCLE
     # -------------------------------------------------------------------------
+
     def start_auction(self):
-        # If no more rubbish to collect, exit
-        if self.location_index >= len(self.trash_locations):
+        """
+        Start a new auction for a selected task according to AUCTION_STRATEGY.
+        """
+        task_id = self.select_next_task()
+        if task_id is None:
             return
-        
-        # Else get next rubbish location
-        x, z, name = self.trash_locations[self.location_index]
-        task_id = self.location_index
-        
-        self.location_index += 1
+
+        x, z, name = self.trash_locations[task_id]
         self.bids_received[task_id] = []
 
         print("-" * 50)
@@ -217,25 +307,27 @@ class SpotterTester(Supervisor):
         self.auction_active = True
         self.active_task_id = task_id
         self.auction_start_time = self.getTime()
+        # Mark as assigned once we actually give it to someone in finish_auction_if_ready
 
-    def finish_auction_if_ready(self, wait_time=2.0):
+    def finish_auction_if_ready(self, wait_time=AUCTION_WAIT_TIME):
+        """ Close auction if wait_time elapsed and assign the task to the best bidder """
         if not self.auction_active or self.active_task_id is None:
             return
-        
+
         if self.getTime() - self.auction_start_time < wait_time:
             return
 
         task_id = self.active_task_id
         bids = self.bids_received.get(task_id, [])
-        
+
         if not bids:
-            print(f"Auction #{task_id} FAILED: No bids. Rewinding index.")
-            # Retry this task next time
-            self.location_index -= 1
+            print(f"Auction #{task_id} FAILED: No bids.")
+            # On failure, just leave task unassigned; it will be picked up
+            # by a future call to start_auction() when a collector is free
         else:
             winner_id, winner_cost = min(bids, key=lambda x: x[1])
             print(f"Winner: {winner_id} (cost: {winner_cost:.2f})")
-            
+
             target_x, target_z, _ = self.trash_locations[task_id]
 
             self.send_message({
@@ -246,10 +338,15 @@ class SpotterTester(Supervisor):
                 "target_z": target_z,
             })
 
+            # Mark this task as assigned (until collected)
+            self.assigned_task_ids.add(task_id)
+
+        # Reset auction state
         self.auction_active = False
         self.active_task_id = None
         self.auction_start_time = 0.0
 
+        # Start a queued auction if any
         if self.auction_queued:
             self.auction_queued = False
             self.start_auction()
@@ -257,18 +354,25 @@ class SpotterTester(Supervisor):
     # -------------------------------------------------------------------------
     # MAIN LOOP
     # -------------------------------------------------------------------------
-    def run(self):
-        while self.step(self.timestep) != -1:
-            for msg in self.receive_messages():
-                event = msg.get("event")
-                if event == "idle":
-                    self.handle_idle(msg)
-                elif event == "bid":
-                    self.handle_bid(msg)
-                elif event == "collected":
-                    self.handle_collected(msg)
 
-            self.finish_auction_if_ready()
+    def run(self):
+        print("Auctioneer running...")
+        try:
+            while self.step(self.timestep) != -1:
+                for msg in self.receive_messages():
+                    event = msg.get("event")
+                    if event == "idle":
+                        self.handle_idle(msg)
+                    elif event == "bid":
+                        self.handle_bid(msg)
+                    elif event == "collected":
+                        self.handle_collected(msg)
+
+                self.finish_auction_if_ready()
+
+        finally:
+            self.logger.stop()
+
 
 if __name__ == "__main__":
     SpotterTester().run()

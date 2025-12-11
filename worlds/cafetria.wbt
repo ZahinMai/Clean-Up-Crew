@@ -295,7 +295,7 @@ Chair {
   name "chair_35"
 }
 DEF collector1 TurtleBot3Burger {
-  translation -3.1013834389162 1.8300015038399569 -0.00024773920606359356
+  translation -3.5 -5.5 -0.00024773920606359356
   rotation 0.0023209661318970808 -4.898376353835309e-06 0.999997306542483 -3.1415926282635946
   name "collector_1"
   controller "collector"
@@ -315,7 +315,7 @@ DEF collector1 TurtleBot3Burger {
   ]
 }
 DEF collector2 TurtleBot3Burger {
-  translation 2.4313504253700517 -1.8298879069727132 -0.0002477392063426828
+  translation 3.5 5.5 -0.0002477392063426828
   rotation 0.0027659462874998586 0.9417911680021912 0.3361870690764342 -0.004928828611680203
   name "collector_2"
   controller "collector"
@@ -335,10 +335,10 @@ DEF collector2 TurtleBot3Burger {
   ]
 }
 DEF human TurtleBot3Burger {
-  translation 0 -1.5 0
+  translation 0 0 0
   rotation 0.0027659462874998586 0.9417911680021912 0.3361870690764342 -0.004928828611680203
   name "pesky human"
-  controller "human_agent"
+  controller "Human_agent"
   extensionSlot [
     RobotisLds01 {
     }

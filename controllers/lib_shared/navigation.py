@@ -15,7 +15,7 @@ from .obstacle_avoidance import SimpleAvoidance
 
 class Navigator:
     """Path planning & following for differential-drive robots."""
-    def __init__(self, map_inflation: int = 0, vis_period: float = 5.0, max_v: float = 0.35, max_w: float = 2.0):
+    def __init__(self, map_inflation: int = 0, vis_period: float = 5.0, max_v: float = 1.5, max_w: float = 2.0):
         # Map + inflated planning grid
         self.grid = get_map()
         self.plan_grid = self.grid.inflate_obstacles(map_inflation)
@@ -62,7 +62,8 @@ class Navigator:
         self.path_world = []
         self.path_idx = 0
 
-    def update(self,  pose: Tuple[float, float, float], lidar_pts: List[Tuple[float, float]], now: float ) -> Tuple[float, float, bool]:
+    
+    def update(self, pose: Tuple[float, float, float], lidar_pts: List[Tuple[float, float]], now: float) -> Tuple[float, float, bool]:
         """Update navigation state and compute velocities"""
         rx, ry, yaw = pose
 
@@ -95,12 +96,62 @@ class Navigator:
         gx_r = dx * math.cos(-yaw) - dy * math.sin(-yaw)
         gy_r = dx * math.sin(-yaw) + dy * math.cos(-yaw)
         
-        # Compute velocities with obstacle avoidance
+        # ========== OBSTACLE PROXIMITY CHECK ==========
+        # Find closest obstacle distance
+        min_obstacle_dist = float('inf')
+        if lidar_pts:
+            for lx, ly in lidar_pts:
+                dist = math.hypot(lx, ly)
+                min_obstacle_dist = min(min_obstacle_dist, dist)
+        
+        # Thresholds for behavior switching
+        DANGER_ZONE = 0.1      # meters - stop forward motion
+        CAUTION_ZONE = 0.2     # meters - slow down significantly
+        SLOW_ZONE = 0.3        # meters - reduce speed
+        
+        # Check if obstacle is in front (within ±45 degrees)
+        obstacle_in_front = False
+        if lidar_pts:
+            for lx, ly in lidar_pts:
+                dist = math.hypot(lx, ly)
+                angle = math.atan2(ly, lx)
+                if dist < CAUTION_ZONE and abs(angle) < math.pi/4:
+                    obstacle_in_front = True
+                    break
+        
+        # ========== SPEED SCALING BASED ON PROXIMITY ==========
+        speed_scale = 1.0
+        
+        if min_obstacle_dist < DANGER_ZONE and obstacle_in_front:
+            # DANGER: Turn in place only (no forward motion)
+            speed_scale = 0.0
+            print(f"DANGER ZONE: Obstacle at {min_obstacle_dist:.2f}m - turning in place")
+            
+        elif min_obstacle_dist < CAUTION_ZONE and obstacle_in_front:
+            # CAUTION: Very slow forward motion
+            speed_scale = 0.2
+            print(f"CAUTION: Obstacle at {min_obstacle_dist:.2f}m - crawling")
+            
+        elif min_obstacle_dist < SLOW_ZONE:
+            # SLOW: Reduced speed proportional to distance
+            speed_scale = (min_obstacle_dist - CAUTION_ZONE) / (SLOW_ZONE - CAUTION_ZONE)
+            speed_scale = max(0.3, min(1.0, speed_scale))
+        
+        # ========== COMPUTE VELOCITIES WITH AVOIDANCE ==========
         v, w = self.avoidance.get_avoidance_velocities(
             lidar_pts, (gx_r, gy_r), self.max_v, self.max_w
         )
+
+        # Apply proximity-based speed reduction to linear velocity only
+        v = v * speed_scale
         
-        return v, w, True       
+        # Optional: Boost angular velocity in danger zone for faster turning
+        if min_obstacle_dist < DANGER_ZONE and obstacle_in_front:
+            w = w * 1.5  # Turn faster when stopped
+            w = max(-self.max_w, min(self.max_w, w))  # Re-clamp
+        
+        return v, w, True
+
     
     def _nearest_free(self, node: Tuple[int, int]) -> Optional[Tuple[int, int]]:
         """BFS to find nearest free grid cell."""
