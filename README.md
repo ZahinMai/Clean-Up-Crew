@@ -1,42 +1,50 @@
 # Cafeteria Clean-Up-Crew: Auction-Based Multi-Robot Coordination
+
 **A Webots simulation framework implementing a "Spotter-Collector" architecture for efficient automated cleaning.**
 
 ## Overview
 
-This project simulates a cafeteria environment where a coordinated team of robots identifies and removes trash. Unlike brute-force swarm approaches, this system utilizes **role specialisation** and an **auction-based task allocation** protocol to minimize redundant travel and maximize efficiency.
+This project simulates a cafeteria environment where a coordinated team of robots identifies and removes trash. Unlike brute-force swarm approaches, this system utilises **role specialisation** and an **auction-based task allocation** protocol to minimize redundant travel and maximize efficiency.
 
 ### The Team (v2.0 Architecture)
 
 1.  **The Auctioneer (Supervisor):**
-    * **Role:** Replaces the physical "Spotter" robot from v1.0.
-    * **Function:** Spawns trash, monitors simulation state, and broadcasts auctions to workers. It serves as the central coordination node.
+      * **Role:** Replaces the physical "Spotter" robot from v1.0.
+      * **Function:** Spawns trash, monitors simulation state, and broadcasts auctions to workers. It serves as the central coordination node.
 2.  **The Collectors (TurtleBot3 Burger):**
-    * **Role:** Worker robots.
-    * **Function:** "Blind" agents that receive task coordinates via auctions. They navigate using a global A* planner and local reactive avoidance.
+      * **Role:** Worker robots.
+      * **Function:** "Blind" agents that receive task coordinates via auctions. They navigate using a global A\* planner and local reactive avoidance.
 3.  **The Human Agent:**
-    * **Role:** Dynamic Obstacle.
-    * **Function:** Patrols a fixed route to test the Collectors' collision avoidance capabilities.
+      * **Role:** Dynamic Obstacle.
+      * **Function:** Patrols a fixed route to test the Collectors' collision avoidance capabilities.
 
----
+-----
 
 ## System Architecture
 
 The project has evolved into a robust Multi-Agent System (MAS) focusing on task allocation efficiency and navigation stability.
 
-### 1. Task Allocation (The Auction)
+### 1\. Task Allocation (The Auction)
+
 **Managed by:** `controllers/auctioneer/auctioneer.py`
 
 The system implements a **Single-Item Auction** protocol:
+
 1.  **Announcement:** The Supervisor broadcasts an `auction_start` message with the location of a trash item.
-2.  **Bidding:** Idle Collectors calculate the path cost (Euclidean/A* distance) to the target and submit a `bid`.
+2.  **Bidding:** Idle Collectors calculate the path cost (Euclidean/A\* distance) to the target and submit a `bid`.
 3.  **Winner Selection:** The Supervisor waits for a timeout (2.0s), selects the lowest bidder, and sends an `assign_task` command.
 4.  **Task Chaining:** Robots can queue tasks if assigned multiple targets, preventing idle time.
 
 #### Strategies & Logic
+
 You can toggle the allocation logic in `controllers/lib_shared/CONFIG.py`.
 
 **A. Sequential Allocation (`"sequential"`)**
-* **Logic:** Auctions tasks in ID order (FIFO). This is the default greedy approach.
+
+  * **Logic:** Auctions tasks in ID order (FIFO). This is the default greedy approach.
+
+<!-- end list -->
+
 ```text
       [ Task List (Sorted by ID) ]
       ┌─────────┬─────────┬─────────┐
@@ -49,7 +57,7 @@ You can toggle the allocation logic in `controllers/lib_shared/CONFIG.py`.
    ┌───────▼───────┐
    │  AUCTIONEER   │  ── "Who wants Task_00?" ──▶  [ Collectors ]
    └───────────────┘
-````
+```
 
 **B. Nearest Task Allocation (`"nearest_task"`)**
 
@@ -115,6 +123,13 @@ You can toggle the allocation logic in `controllers/lib_shared/CONFIG.py`.
   * **Webots R2025a** (or compatible)
   * **Python 3.8+**
 
+### Dependencies
+
+The project relies on the **Python Standard Library** and Webots API. No external `pip` installations are required.
+
+  * **Webots API:** `controller`
+  * **Standard Libs:** `math`, `json`, `sys`, `os`, `datetime`, `random`, `collections`, `heapq`, `dataclasses`, `typing`.
+
 ### Running the Simulation
 
 1.  **Clone the repository:**
@@ -136,8 +151,19 @@ To change the auction strategy, edit `controllers/lib_shared/CONFIG.py`:
 auction_strategy = "nearest_task"
 ```
 
-## Test logs
-With each simulation run, a text file of the debug output from the console is saved..
+## Logging & Output
+
+With each simulation run, a text file of the debug output from the console is saved automatically. The system uses a custom `DualLogger` to capture `stdout` and write it to markdown files for post-run analysis.
+
+  * Logs are initialised immediately when the controllers start.
+  * Auctioneer logs:
+     * Located in  `controllers/auctioneer/logs/`
+     * Record of every auction start, bid received, winner assignment, and task completion event.
+  * Collector logs
+     * Located in `controllers/collector/logs/`
+     * Records state transitions (`IDLE` -\> `NAVIGATING`), path planning metrics (number of waypoints), and ASCII map visualizations showing the robot's position and path 
+  * Files are named with timestamps to prevent overwrites, e.g., `auction_output_20251211_224745.md` or `nav_output_20251211_224745.md`.
+
 -----
 
 ## File Structure
