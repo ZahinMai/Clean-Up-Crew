@@ -5,48 +5,106 @@
 
 This project simulates a cafeteria environment where a coordinated team of robots identifies and removes trash. Unlike brute-force swarm approaches, this system utilizes **role specialisation** and an **auction-based task allocation** protocol to minimize redundant travel and maximize efficiency.
 
-### The Team
+### The Team (v2.0 Architecture)
 
-1.  **The Spotter (e-puck):** A robot that patrols the environment using a coverage algorithm. It detects trash using computer vision and "auctions" the cleaning task to the "Collector" fleet.
-2.  **The Collectors (TurtleBot3 Burger):** "Blind" worker robots that bid on tasks based on their distance and current state. The winner plans it's path to the target using A* (global_planer) and avoids the human (dynamic obstacle) using DWA (local_planner)
-3.  **The Supervisor:** Manages the simulation state, spawns trash objects (blue spheres), and tracks successful collections.
-4.  **Human Agent:** A dynamic obstacle that moves between waypoints to test robot avoidance capabilities.
+1.  **The Auctioneer (Supervisor):**
+    * **Role:** Replaces the physical "Spotter" robot from v1.0.
+    * **Function:** Spawns trash, monitors simulation state, and broadcasts auctions to workers. It serves as the central coordination node.
+2.  **The Collectors (TurtleBot3 Burger):**
+    * **Role:** Worker robots.
+    * **Function:** "Blind" agents that receive task coordinates via auctions. They navigate using a global A* planner and local reactive avoidance.
+3.  **The Human Agent:**
+    * **Role:** Dynamic Obstacle.
+    * **Function:** Patrols a fixed route to test the Collectors' collision avoidance capabilities.
 
------
+---
 
 ## System Architecture
 
-The project is built on a modular architecture separating high-level logic from low-level control.
+The project has evolved into a robust Multi-Agent System (MAS) focusing on task allocation efficiency and navigation stability.
 
-### 1\. Communication & Task Allocation
+### 1. Task Allocation (The Auction)
+**Managed by:** `controllers/auctioneer/auctioneer.py`
 
-Implemented in `lib_shared/communication.py`.
+The system implements a **Single-Item Auction** protocol:
+1.  **Announcement:** The Supervisor broadcasts an `auction_start` message with the location of a trash item.
+2.  **Bidding:** Idle Collectors calculate the path cost (Euclidean/A* distance) to the target and submit a `bid`.
+3.  **Winner Selection:** The Supervisor waits for a timeout (2.0s), selects the lowest bidder, and sends an `assign_task` command.
+4.  **Task Chaining:** Robots can queue tasks if assigned multiple targets, preventing idle time.
 
-  * **Protocol:** JSON-based messaging via Webots Emitter/Receiver nodes.
-  * **Auction Process:**
-    1.  **Discovery:** Spotter detects trash and broadcasts an `auction_start` event with coordinates.
-    2.  **Bidding:** Idle Collectors calculate the A\* path cost to the target and reply with a `bid`.
-    3.  **Assignment:** The Spotter (or testing agent) assigns the task to the lowest bidder.
-    4.  **Execution:** The winning Collector transitions to `NAVIGATING` state.
+#### Strategies & Logic
+You can toggle the allocation logic in `controllers/lib_shared/CONFIG.py`.
+
+**A. Sequential Allocation (`"sequential"`)**
+* **Logic:** Auctions tasks in ID order (FIFO). This is the default greedy approach.
+```text
+      [ Task List (Sorted by ID) ]
+      ┌─────────┬─────────┬─────────┐
+      │ Task_00 │ Task_01 │ Task_02 │ ...
+      └────┬────┴─────────┴─────────┘
+           │
+           ▼
+    ( Selects First )
+           │
+   ┌───────▼───────┐
+   │  AUCTIONEER   │  ── "Who wants Task_00?" ──▶  [ Collectors ]
+   └───────────────┘
+````
+
+**B. Nearest Task Allocation (`"nearest_task"`)**
+
+  * **Logic:** The Auctioneer calculates the distance from **every idle robot** to **every available task** and selects the task that minimizes travel time for the fleet.
+
+<!-- end list -->
+
+```text
+        Task_A                        Task_B
+          │                             │
+    (5m away)                     (1m away)
+          │                             │
+    ┌─────▼─────┐                 ┌─────▼─────┐
+    │ Collector │                 │ Collector │
+    │    #1     │                 │    #2     │
+    └───────────┘                 └───────────┘
+          ▲                             ▲
+          └──────────────┬──────────────┘
+                         │
+                  (Compares Distances)
+                         │
+             ┌───────────▼───────────┐
+             │      AUCTIONEER       │ ── "Task_B is closest to a bot."
+             │  Selects Task_B next  │ ── "Who wants Task_B?" ──▶
+             └───────────────────────┘
+```
+
+**C. Random Allocation (`"random"`)**
+
+  * **Logic:** Selects a random task from the pool to load-balance or test robustness.
+
+<!-- end list -->
+
+```text
+     [ Task Pool ]
+    { Task_05, Task_02, Task_09, Task_01 }
+           │
+           ▼
+    (Random Roll) ──▶ Picks Task_09
+           │
+   ┌───────▼───────┐
+   │  AUCTIONEER   │  ── "Who wants Task_09?" ──▶  [ Collectors ]
+   └───────────────┘
+```
 
 ### 2\. Navigation Stack
 
-  * **Global Planner (`AStarPlanner`):**
-      * Uses an Occupancy Grid (`map_module.py`) to represent the cafeteria.
-      * Calculates the optimal path using A\* with Euclidean distance heuristics.
-      * Includes path smoothing to remove unnecessary waypoints.
-  * **Local Planner (`DWA`):**
-      * Implements the **Dynamic Window Approach** to avoid dynamic obstacles (like the Human Agent) while tracking the global path.
-      * Calculates safe linear and angular velocities based on LiDAR point clouds.
+**Managed by:** `controllers/lib_shared/navigation.py`
 
-### 3\. Perception
-
-  * **Vision (`vision.py`):**
-      * Uses a DFS (Depth-First Search) flood-fill algorithm on camera images to cluster pixels.
-      * Identifies objects based on RGB thresholds (specifically filtering for blue "trash" objects).
-  * **Coverage (`coverage.py`):**
-      * Decomposes the map into rectangular zones.
-      * Generates "lawnmower" patterns to ensure the Spotter visually covers the entire accessible floor area.
+  * \**Global Planner (A*):\*\*
+      * Uses a binary **Occupancy Grid** (`map_module.py`) to represent the cafeteria.
+      * Plans an optimal path of grid cells, then smooths them into world-space waypoints.
+  * **Local Planner (Reactive Avoidance):**
+      * *Note: DWA was removed from Collectors in v2.0 for stability.*
+      * Uses **Simple Avoidance** (`obstacle_avoidance.py`): A lightweight controller that slows down or turns in place when LiDAR detects obstacles within a critical radius (\<0.25m).
 
 -----
 
@@ -54,37 +112,28 @@ Implemented in `lib_shared/communication.py`.
 
 ### Prerequisites
 
-  * **Webots R2025a** (or compatible version)
-  * **Python 3.8+** (Standard libraries used: `math`, `json`, `heapq`, `collections`)
+  * **Webots R2025a** (or compatible)
+  * **Python 3.8+**
 
 ### Running the Simulation
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/ZahinMai/Clean-Up-Crew.git
+    git clone [https://github.com/ZahinMai/Clean-Up-Crew.git](https://github.com/ZahinMai/Clean-Up-Crew.git)
     ```
 2.  **Launch Webots:**
     Open the world file: `worlds/cafetria.wbt`.
-3.  **Start the Simulation:**
-    Press the **Play** button in the Webots interface.
-      * The **Supervisor** will spawn 10 blue trash objects.
-      * The **Spotter** will begin its patrol pattern.
-      * **Collectors** will idle until receiving tasks.
+3.  **Start:**
+    Press **Play**. The Supervisor will spawn trash and begin the auction cycle immediately.
 
-### Switching Setups for Hypothesis Evaluation 
-The two existing modes are `Auction` and `Coverage` with the former being the default setup.
-To switch setups, navigate to the Auctioneer bot in the scene tree and edit the `customData` field to be `SETUP:COVERAGE`.
-To return to the original setup, edit this same field to be `SETUP:AUCTION`.
+### Configuration
 
-### Running Automated Tests
+To change the auction strategy, edit `controllers/lib_shared/CONFIG.py`:
 
-To verify the auction logic and navigation without waiting for the full simulation loop:
-
-1.  Select the **Spotter** robot in the Webots scene tree.
-2.  Change the `controller` field from `spotter` to `test_spotter_comm`.
-3.  Save and Reload.
-4.  The system will run through 5 scenarios (Sanity Check, Static Nav, Dynamic Avoidance, Multi-Agent Competition).
-5.  Results are logged to the console and `logs/` directory.
+```python
+# Options: "sequential", "nearest_task", "random"
+auction_strategy = "nearest_task"
+```
 
 -----
 
@@ -93,39 +142,34 @@ To verify the auction logic and navigation without waiting for the full simulati
 ```text
 Clean-Up-Crew/
 ├── controllers/
-│   ├── collector/              # Logic for worker robots
-│   │   ├── collector.py        # Main FSM (IDLE <-> NAVIGATING)
-│   │   └── logs/               # Execution reports
-│   ├── spotter/                # Logic for the sensing robot
-│   │   └── spotter.py          # Vision and Coverage integration
-│   ├── supervisor/             # Game master logic
-│   │   └── supervisor.py       # Spawns trash, tracks score
+│   ├── auctioneer/             # Supervisor logic (New central coordinator)
+│   │   └── auctioneer.py       # Main spawning & auction logic
+│   ├── collector/              # Worker robot logic
+│   │   └── collector.py        # FSM: IDLE <-> NAVIGATING
 │   ├── Human_agent/            # Dynamic obstacle logic
-│   ├── test_spotter_comm/      # Unit testing for auctions
-│   └── lib_shared/             # CORE LIBRARIES
-│       ├── communication.py    # JSON messaging wrapper
-│       ├── coverage.py         # Zone decomposition planner
-│       ├── global_planner.py   # A* implementation
-│       ├── local_planner.py    # DWA implementation
-│       ├── map_module.py       # Grid representation
-│       ├── dual_logger.py      # Logging utility
-│       └── vision.py           # Pixel processing
+│   ├── lib_shared/             # SHARED LIBRARIES
+│   │   ├── communication.py    # JSON messaging wrapper
+│   │   ├── global_planner.py   # A* Implementation
+│   │   ├── navigation.py       # Navigation Manager
+│   │   ├── obstacle_avoidance.py # Simple Reactive Dodge
+│   │   └── map_module.py       # Occupancy Grid
+│   └── archive/                # Deprecated components
+│       └── spotter.py          # Legacy visual search robot (v1.0)
 └── worlds/
-    ├── cafetria.wbt            # Main simulation environment
-    └── .cafetria.wbproj        # Project configuration
+    └── cafetria.wbt            # Simulation Environment
 ```
 
 -----
 
 ## Contributors
 
-  * **Zahin Maisa:** Architecture, Global Navigation (A\*), Testing Framework.
-  * **Abdullateef Vahora:** Spotter Logic, Computer Vision, Coverage Planning.
-  * **Ajinkya:** Local Path Planning (DWA).
-  * **Kunal:** Communication Protocol.
+  * **Zahin Maisa:** Project Lead, Architecture, A\* Navigation, Collector FSM.
+  * **Abdullateef Vahora:** Supervisor/Auctioneer Logic, Legacy Vision System.
+  * **Ajinkya:** World Design, Dynamic Obstacle (Human Agent).
+  * **Kunal:** Communication Protocol, Documentation.
 
 -----
 
 ## License
 
-This project is licensed under the **MIT License**. See [LICENSE](https://www.google.com/search?q=LICENSE) for details.
+This project is licensed under the **MIT License**.
