@@ -15,12 +15,29 @@ if os.path.dirname(os.path.dirname(__file__)) not in sys.path:
 
 from lib_shared.dual_logger import Logger
 from lib_shared.map_module import get_map
-from lib_shared.CONFIG import auction_strategy
+from lib_shared.CONFIG import auction_strategy, trash_spawn_strategy
 
-AUCTION_STRATEGY = auction_strategy # set in CONFIG.py
+# Set these in CONFIG.py
+SPAWN_STRATEGY = trash_spawn_strategy  # "random" | "fixed"
+AUCTION_STRATEGY = auction_strategy  # "sequential" | "nearest_task" | "random"
 
 # How long to wait for bids before closing an auction
-AUCTION_WAIT_TIME = 2.0 # in seconds
+AUCTION_WAIT_TIME = 2.0  # in seconds
+
+# Fixed trash locations (x, z coordinates)
+# Only used when SPAWN_STRATEGY = "fixed"
+FIXED_TRASH_LOCATIONS = [
+    (0.5, 0.5),
+    (1.0, 1.0),
+    (1.5, 0.5),
+    (0.5, 1.5),
+    (2.0, 2.0),
+    (2.5, 1.5),
+    (1.0, 2.5),
+    (3.0, 1.0),
+    (1.5, 3.0),
+    (3.0, 3.0),
+]
 
 TRASH_TEMPLATE = """
 DEF TRASH_%d Solid {
@@ -75,7 +92,7 @@ class Auctioneer(Supervisor):
         self.root_children = self.getRoot().getField("children")
 
         # Task management
-        self.trash_locations =  []
+        self.trash_locations = []
         self.completed_task_ids = set()
         self.assigned_task_ids = set()  # tasks auctioned and assigned but not yet completed
 
@@ -93,12 +110,36 @@ class Auctioneer(Supervisor):
         self.spawn_rubbish()
 
     # -------------------------------------------------------------------------
-    # TRASH INITIALISATION / CLEANUP (stubbed hooks)
+    # TRASH INITIALISATION / CLEANUP
     # -------------------------------------------------------------------------
     def spawn_rubbish(self):
-        """Spawns rubbish only on free cells in the occupancy grid."""
-        self.logger.write("Spawning rubbish...\n")
+        """Spawns rubbish based on SPAWN_STRATEGY configuration."""
+        self.logger.write(f"Spawning rubbish using strategy: {SPAWN_STRATEGY}\n")
 
+        if SPAWN_STRATEGY == "fixed":
+            self._spawn_fixed_rubbish()
+        else:  # "random" or any other value defaults to random
+            self._spawn_random_rubbish()
+
+    def _spawn_fixed_rubbish(self):
+        """Spawns rubbish at predefined fixed locations."""
+        for i, (x, y) in enumerate(FIXED_TRASH_LOCATIONS):
+            # Track this rubbish location
+            self.trash_locations.append((x, y, f"rubbish at ({x}, {y})"))
+
+            # Remove any existing object with this DEF
+            existing_node = self.getFromDef(f"TRASH_{i}")
+            if existing_node:
+                existing_node.remove()
+
+            # Spawn the rubbish at the fixed location
+            trash_str = TRASH_TEMPLATE % (i, x, y)
+            self.root_children.importMFNodeFromString(-1, trash_str)
+        
+        self.logger.write(f"Spawned {len(FIXED_TRASH_LOCATIONS)} rubbish items at fixed locations\n")
+
+    def _spawn_random_rubbish(self):
+        """Spawns rubbish randomly on free cells in the occupancy grid."""
         # Collect all free cells from the grid
         free_cells = [
             (r, c)
@@ -106,7 +147,6 @@ class Auctioneer(Supervisor):
             for c in range(self.occupancy_grid.width)
             if self.occupancy_grid.is_free(r, c)
         ]
-
 
         num_rubbish = min(10, len(free_cells))
 
@@ -120,7 +160,7 @@ class Auctioneer(Supervisor):
             # Track this rubbish location
             self.trash_locations.append((x, y, f"rubbish at ({x}, {y})"))
 
-            # Remove any existing object with this DEF, just like before
+            # Remove any existing object with this DEF
             existing_node = self.getFromDef(f"TRASH_{i}")
             if existing_node:
                 existing_node.remove()
@@ -129,7 +169,7 @@ class Auctioneer(Supervisor):
             trash_str = TRASH_TEMPLATE % (i, x, y)
             self.root_children.importMFNodeFromString(-1, trash_str)
         
-        self.logger.write(f"Spawned {num_rubbish} rubbish items\n")
+        self.logger.write(f"Spawned {num_rubbish} rubbish items randomly\n")
             
     def remove_trash(self, task_id):
         """Removes the rubbish associated with the given task ID."""

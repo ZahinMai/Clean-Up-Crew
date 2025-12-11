@@ -105,7 +105,7 @@ class Navigator:
                 min_obstacle_dist = min(min_obstacle_dist, dist)
         
         # Thresholds for behavior switching
-        DANGER_ZONE = 0.05      # meters - stop forward motion
+        DANGER_ZONE = 0.1      # meters - stop forward motion
         CAUTION_ZONE = 0.2     # meters - slow down significantly
         SLOW_ZONE = 0.3        # meters - reduce speed
         
