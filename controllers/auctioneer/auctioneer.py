@@ -1,5 +1,5 @@
 # ============================================= #
-# TASK MANAGER/ AUCTIONEER   -> ABDUL & ZAHIN  #
+# TASK MANAGER/ AUCTIONEER   -> ABDUL & ZAHIN   #
 # ==============================================#
 # Spawns rubbish & assigns collection           #
 # to Collector bots by which one is closest     #
@@ -71,11 +71,45 @@ class SpotterTester(Supervisor):
         self.rubbish_locations = []
         self.location_index = 0
 
+        self.setup = "AUCTION" # Default
+        self_node = self.getFromDef("auctioneer")
+        if self_node:
+            data = self_node.getField("customData").getSFString()
+            if "SETUP:COVERAGE" in data:
+                self.setup = "COVERAGE"
+            elif "SETUP:AUCTION" in data:
+                self.setup = "AUCTION"
+
+        print(f"INITIALIZING IN {self.setup} SETUP")
+
         # --- SPAWN rubbish ---
         self.root_children = self.getRoot().getField("children")
         self.spawn_rubbish()
 
-        print("SPOTTER AUCTION TEST (AUTO) STARTED")
+        # Broadcast Setup immediately after spawn
+        self.broadcast_setup()
+
+        print("SUPERVISOR STARTED")
+
+    # -------------------------------------------------------------------------
+    # CONFIGURATION BROADCAST
+    # -------------------------------------------------------------------------
+    def broadcast_setup(self):
+        """Sends the current setup and full rubbish list to all collectors for the coverage setup."""
+        clean_list = []
+        for i, (x, y, _) in enumerate(self.rubbish_locations):
+            clean_list.append({"id": i, "x": x, "y": y})
+
+        msg = {
+            "event": "configure",
+            "setup": self.setup,
+            "rubbish_list": clean_list
+        }
+
+        # Send multiple times to ensure collectors wake up and receive it
+        for _ in range(5):
+            self.send_message(msg)
+            self.step(self.timestep)
 
     # -------------------------------------------------------------------------
     # SUPERVISOR METHODS (Spawn/Delete)
@@ -91,7 +125,6 @@ class SpotterTester(Supervisor):
             for c in range(self.occupancy_grid.width)
             if self.occupancy_grid.is_free(r, c)
         ]
-
 
         num_rubbish = min(10, len(free_cells))
 
@@ -149,6 +182,9 @@ class SpotterTester(Supervisor):
         # Stop if all tasks done
         if len(self.completed_task_ids) >= len(self.rubbish_locations): return
 
+        # In COVERAGE setup, collectors are running their coverage pattern.
+        if self.setup == "COVERAGE": return
+
         # Queue logic
         if self.auction_active:
             self.auction_queued = True
@@ -156,6 +192,8 @@ class SpotterTester(Supervisor):
             self.start_auction()
 
     def handle_bid(self, msg):
+        if self.setup == "COVERAGE": return # Ignore bids in coverage mode
+
         collector_id = msg.get("collector_id")
         task_id = msg.get("task_id")
         cost = msg.get("cost")
@@ -259,6 +297,10 @@ class SpotterTester(Supervisor):
     # -------------------------------------------------------------------------
     def run(self):
         while self.step(self.timestep) != -1:
+            # Re-broadcast setup periodically 
+            if self.getTime() % 5.0 < (self.timestep / 1000.0):
+                 self.broadcast_setup()
+
             for msg in self.receive_messages():
                 event = msg.get("event")
                 if event == "idle":
@@ -268,7 +310,8 @@ class SpotterTester(Supervisor):
                 elif event == "collected":
                     self.handle_collected(msg)
 
-            self.finish_auction_if_ready()
+            if self.setup == "AUCTION":
+                self.finish_auction_if_ready()
 
 if __name__ == "__main__":
     SpotterTester().run()

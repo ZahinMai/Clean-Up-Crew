@@ -15,6 +15,8 @@ from lib_shared.communication import Communication
 from lib_shared.navigation import Navigator
 from lib_shared.dual_logger import Logger
 
+from collector_coverage import run_coverage_setup
+
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
@@ -88,7 +90,7 @@ class Collector(Robot):
         self.last_idle_broadcast = 0.0
         self.idle_interval = 1.0  # seconds
 
-        print(f"{self.robot_id}: Initialised in IDLE state")
+        print(f"{self.robot_id}: Initialised - Waiting for Setup...")
 
         # Send initial IDLE immediately so auctioneer knows we exist
         # (position will be updated after first sensor step)
@@ -119,6 +121,25 @@ class Collector(Robot):
         else:
             print(f"{self.robot_id}: FAILED to broadcast IDLE")
         return ok
+    
+    # Handshake / Setup Logic
+    def wait_for_setup(self):
+        """Blocks until the Supervisor broadcasts the setup configuration."""
+        print("Waiting for configuration from Supervisor...")
+        while self.step(self.timestep) != -1:
+
+            while True:
+                msg = self.comm.receive()
+                if not msg:
+                    break
+
+                if msg.get("event") == "configure":
+                    setup = msg.get("setup", "AUCTION")
+                    rubbish = msg.get("rubbish_list", [])
+                    print(f"Received Configuration: {setup}")
+                    return setup, rubbish
+
+        return "AUCTION", [] # Fallback
 
     # ---------------------------------------------------------------------- #
     # Auction handling                                                       #
@@ -182,6 +203,16 @@ class Collector(Robot):
     # Main loop                                                              #
     # ---------------------------------------------------------------------- #
     def run(self):
+        setup_mode, rubbish_list = self.wait_for_setup()
+
+        if setup_mode == "COVERAGE":
+            try:
+                run_coverage_setup(self, rubbish_list)
+            finally:
+                self.logger.stop()
+            return
+
+        # ELSE: Default Auction Logic
         print(f"\nCollector Started | Mode: Auction-Based\n")
 
         try:
