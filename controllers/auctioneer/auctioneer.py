@@ -17,7 +17,6 @@ from lib_shared.dual_logger import Logger
 from lib_shared.map_module import get_map
 from lib_shared.CONFIG import auction_strategy
 
-
 AUCTION_STRATEGY = auction_strategy # set in CONFIG.py
 
 # How long to wait for bids before closing an auction
@@ -272,9 +271,7 @@ class Auctioneer(Supervisor):
         if len(self.completed_task_ids) >= len(self.trash_locations):
             elapsed_time = self.getTime() - self.start_time
             self.logger.write("=" * 70 + "\n")
-            self.logger.write(f"CONFIG: {AUCTION_STRATEGY} Time Elapsed: {elapsed_time}\n")
-            self.logger.write("=" * 70 + "\n")
-            self.logger.write("=" * 70 + "\n")
+            self.logger.write(f"Auction Strategy: {AUCTION_STRATEGY},  Time Elapsed: {elapsed_time}\n")
             self.logger.write("ALL TASKS COMPLETED. SAVING LOGS & EXITING.\n")
             self.logger.write("=" * 70 + "\n")
             self.logger.stop()
@@ -359,7 +356,6 @@ class Auctioneer(Supervisor):
     # -------------------------------------------------------------------------
     # MAIN LOOP
     # -------------------------------------------------------------------------
-
     def run(self):
         self.logger.write("Auctioneer running...\n")
         try:
