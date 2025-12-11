@@ -45,7 +45,7 @@ def yaw_from(imu, compass):
     """
     if compass:
         try:
-            n = compass.getValues()  # [x, y, z]
+            n = compass.getValues()
             return math.atan2(n[0], n[2])
         except Exception:
             pass
@@ -91,28 +91,22 @@ def main():
     if lidar:
         lidar.enable(ts)
 
-    # Lighter, faster DWA settings
     dwa = DWA(
         {
-            "V_MAX": 0.45,     
-            "W_MAX": 2.2,
-            "SAFE": 0.07,
-            "CLEAR_N": 0.5,
-            "GAMMA": 0.22,
+            "V_MAX": 0.40,
+            "SAFE": 0.18,
+            "CLEAR_N": 0.9,
+            "GAMMA": 0.24,
             "BETA": 0.34,
             "ALPHA": 0.18,
-            "DELTA": 0.46,
+            "DELTA": 0.40,
             "EPS": 0.05,
-            "NV": 5,           
-            "NW": 9,          
-            "T_PRED": 1.0,     
-            "DT_SIM": 0.1,     
         }
     )
 
     idx = 0
     prev = (0.0, 0.0)
-    smooth = 0.1   # a bit snappier
+    smooth = 0.15
 
     last_move_time = 0.0
     last_x = None
@@ -141,16 +135,17 @@ def main():
         hfov = lidar.getFov()
         nscan = lidar.getHorizontalResolution()
         pts = []
+        min_front = float("inf")
         if nscan > 1:
-            step = 4  # use every 4th ray to keep it cheap
-            for i in range(0, nscan, step):
-                r = ranges[i]
-                if r == float("inf") or r <= 0.05 or r > 3.0:
+            for i, r in enumerate(ranges):
+                if r == float("inf") or r <= 0.04:
                     continue
                 a = -hfov * 0.5 + hfov * i / (nscan - 1)
                 x_o = r * math.cos(a)
                 y_o = r * math.sin(a)
                 pts.append((x_o, y_o))
+                if abs(a) < 0.35 and r < min_front:
+                    min_front = r
 
         if last_x is None:
             last_x, last_z = x, z
@@ -167,17 +162,18 @@ def main():
         gx, gy = world_to_robot(dx, dz, yaw)
 
         if recovery_until > now:
-            v = -0.2
-            w = 1.4 * recovery_sign
+            v = -0.18
+            w = 1.2 * recovery_sign
         else:
-            v_cmd, w_cmd = dwa.get_safe_velocities(
-                pts, (gx, gy), prev_cmd=prev, cur=prev
-            )
+            v_cmd, w_cmd = dwa.get_safe_velocities(pts, (gx, gy), prev_cmd=prev, cur=prev)
+            if min_front < 0.40:
+                scale = max(0.15, (min_front - 0.15) / 0.25)
+                v_cmd *= scale
             v = smooth * prev[0] + (1.0 - smooth) * v_cmd
             w = smooth * prev[1] + (1.0 - smooth) * w_cmd
 
-        max_v = 0.4
-        max_w = 2.0
+        max_v = 0.35
+        max_w = 1.4
         v = max(-max_v, min(max_v, v))
         w = max(-max_w, min(max_w, w))
 
