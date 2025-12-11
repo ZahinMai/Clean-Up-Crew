@@ -43,26 +43,21 @@ def yaw_from(imu, compass):
     Prefer the compass (more stable for planar robots),
     fall back to IMU if no compass is available.
     """
-    # Prefer compass: vector points towards north; yaw=0 along +x
     if compass:
         try:
             n = compass.getValues()  # [x, y, z]
-            # Use same convention as your other controllers: atan2(x, z)
             return math.atan2(n[0], n[2])
         except Exception:
             pass
 
-    # Fallback: inertial unit roll/pitch/yaw
     if imu:
         try:
             roll, pitch, yaw = imu.getRollPitchYaw()
-            # Sometimes yaw can be NaN or inf during start-up
             if math.isfinite(yaw):
                 return yaw
         except Exception:
             pass
 
-    # Last resort
     return 0.0
 
 
@@ -96,22 +91,28 @@ def main():
     if lidar:
         lidar.enable(ts)
 
+    # Lighter, faster DWA settings
     dwa = DWA(
         {
-            "V_MAX": 0.30,
-            "SAFE": 0.08,
-            "CLEAR_N": 0.6,
+            "V_MAX": 0.45,     
+            "W_MAX": 2.2,
+            "SAFE": 0.07,
+            "CLEAR_N": 0.5,
             "GAMMA": 0.22,
             "BETA": 0.34,
             "ALPHA": 0.18,
             "DELTA": 0.46,
             "EPS": 0.05,
+            "NV": 5,           
+            "NW": 9,          
+            "T_PRED": 1.0,     
+            "DT_SIM": 0.1,     
         }
     )
 
     idx = 0
     prev = (0.0, 0.0)
-    smooth = 0.15
+    smooth = 0.1   # a bit snappier
 
     last_move_time = 0.0
     last_x = None
@@ -141,8 +142,10 @@ def main():
         nscan = lidar.getHorizontalResolution()
         pts = []
         if nscan > 1:
-            for i, r in enumerate(ranges):
-                if r == float("inf") or r <= 0.04:
+            step = 4  # use every 4th ray to keep it cheap
+            for i in range(0, nscan, step):
+                r = ranges[i]
+                if r == float("inf") or r <= 0.05 or r > 3.0:
                     continue
                 a = -hfov * 0.5 + hfov * i / (nscan - 1)
                 x_o = r * math.cos(a)
@@ -164,15 +167,17 @@ def main():
         gx, gy = world_to_robot(dx, dz, yaw)
 
         if recovery_until > now:
-            v = -0.18
-            w = 1.2 * recovery_sign
+            v = -0.2
+            w = 1.4 * recovery_sign
         else:
-            v_cmd, w_cmd = dwa.get_safe_velocities(pts, (gx, gy), prev_cmd=prev, cur=prev)
+            v_cmd, w_cmd = dwa.get_safe_velocities(
+                pts, (gx, gy), prev_cmd=prev, cur=prev
+            )
             v = smooth * prev[0] + (1.0 - smooth) * v_cmd
             w = smooth * prev[1] + (1.0 - smooth) * w_cmd
 
-        max_v = 0.26
-        max_w = 1.4
+        max_v = 0.4
+        max_w = 2.0
         v = max(-max_v, min(max_v, v))
         w = max(-max_w, min(max_w, w))
 
