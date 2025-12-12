@@ -17,15 +17,14 @@ coverage_planner = CoveragePlanner(grid)
 mission_waypoints = coverage_planner.generate_hardcoded_waypoints()
 
 swarm_waypoints = {
-    "collector_1": list(reversed(mission_waypoints[14:])), # Bottom half of the grid
-    "collector_2": mission_waypoints[:14], # Top half of the grid
+    "collector_1": mission_waypoints[18:], # Left Side
+    "collector_2": mission_waypoints[:18], # Right Side
 }
 
 baseline_waypoints = {
     "collector_1": [], # No waypoints
     "collector_2": mission_waypoints, # Full grid
 }
-print(mission_waypoints)
 
 def get_lidar_points(lidar, max_r=3.5, min_r=0.1):
     """Helper to get lidar points."""
@@ -52,6 +51,7 @@ def run_coverage_setup(robot, rubbish_list, setup_mode):
     current_wp_idx = 0
 
     if waypoints:
+        robot.update_pose()
         robot.nav.plan_path((robot.rx, robot.ry), waypoints[current_wp_idx])
 
     collected_ids = set()

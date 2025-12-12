@@ -50,24 +50,47 @@ class CoveragePlanner:
     
     def generate_hardcoded_waypoints(self):
         """
-        Generates waypoints covering the grid from Top to Bottom with equally spaced waypoints for this specific map.
-        Used as a fallback or simple coverage method.
+        Generates waypoints, splittting the grid into Right/Left stripes, but adds a 'Center Tap' (x=0)
+        on safe rows to ensure the middle ground is covered.
         """
-        # Define the grid lines
-        x_cols = [3.6, 1.2, -1.2, -3.6] 
-        y_rows = [5.1, 3.4, 1.7, 0.0, -1.7, -3.4, -5.1] 
+        y_rows = [5.1, 3.4, 1.7, 0.0, -1.7, -3.4, -5.1]
         
-        final_waypoints = []
+        right_stripe = self._generate_zigzag_stripe([3.6, 1.2], y_rows) # Right Side (Top->Bottom)
+        left_stripe = self._generate_zigzag_stripe([-3.6, -1.2], list(reversed(y_rows))) # Left Side (Bottom->Top)
         
-        for i, y in enumerate(y_rows):
-            if i % 2 == 0:
-                row_points = [(x, y) for x in x_cols]
-            else:
-                row_points = [(x, y) for x in reversed(x_cols)]
-                
-            final_waypoints.extend(row_points)
+        return right_stripe + left_stripe
+
+    def _generate_zigzag_stripe(self, cols, rows):
+        """Generates a path for a 2-column stripe with Center Taps."""
+        waypoints = []
+        outer, inner = cols
+        center_x = 0.0
+        
+        # Iterate through the 4 Safe Rows where tables are not present
+        for i in range(4): 
+            row_idx = i * 2
+            y_safe = rows[row_idx]
             
-        return final_waypoints
+            if i % 2 == 0:
+                current_sweep = [(outer, y_safe), (center_x, y_safe), (inner, y_safe)]
+            else:
+                current_sweep = [(inner, y_safe), (center_x, y_safe), (outer, y_safe)]
+            
+            waypoints.extend(current_sweep)
+            
+            # Backtrack to previous row
+            last_x = current_sweep[-1][0]
+            
+            if row_idx - 1 >= 0:
+                y_back = rows[row_idx - 1]
+                waypoints.append((last_x, y_back))
+                
+            # Bridge to next row
+            if row_idx + 1 < len(rows):
+                y_next = rows[row_idx + 1]
+                waypoints.append((last_x, y_next))
+                
+        return waypoints
 
     def _decompose_grid(self):
         """Iteratively finds the largest valid rectangle of free space starting from top-left."""

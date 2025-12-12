@@ -60,7 +60,7 @@ class Collector(Robot):
         # Logging + communication
         self.logger = Logger(prefix=self.robot_id, enabled=True)
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.logger.start(f"nav_output_{self.robot_id}_{timestamp}.md")
+        self.logger.start(f"nav_output_{self.robot_id[-1]}_{timestamp}.md")
         self.comm = Communication(self, CHANNEL)
 
         # Sensors
@@ -329,8 +329,6 @@ class Collector(Robot):
             self.logger.write("="*40 + "\n")
             self.logger.write(f"Total Idle Time:   {self.total_idle_time:.3f} s\n")
             self.logger.write(f"Collision Count:   {self.collision_count}\n")
-            self.logger.write(f"Distance covered:   {self.dist_covered}\n")
-            self.logger.write(f"Time Elapsed:   {elapsed_time:.3f} s\n")
             self.logger.write(f"Distance Covered:  {self.dist_covered:.3f} m\n")
             self.logger.write(f"Time Elapsed:      {elapsed_time:.3f} s\n")
             self.logger.write("="*40 + "\n")
