@@ -18,7 +18,7 @@ WorldInfo {
 }
 Viewpoint {
   orientation 0.05137083110069159 0.996900827504543 -0.05958001202401501 1.4219103549831194
-  position -2.8170860771047863 1.4039128599998318 19.195718715738774
+  position -2.471827955778627 1.3688198057462384 16.929340875071844
 }
 TexturedBackground {
   texture "entrance_hall"
@@ -365,12 +365,9 @@ DEF human TurtleBot3Burger {
     }
   ]
 }
-Robot {
+DEF auctioneer Robot {
   translation 2.2000046490888248 1.049008185876706 -0.00035900977803383916
   rotation -0.0011816475225585035 0.0012666173949227567 0.9999984996936282 1.5645174478508965
-  name "auctioneer"
-  controller "auctioneer"
-  supervisor TRUE
   children [
     Emitter {
       channel 1
@@ -379,4 +376,7 @@ Robot {
       channel 1
     }
   ]
+  name "auctioneer"
+  controller "auctioneer"
+  supervisor TRUE
 }

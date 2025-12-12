@@ -131,8 +131,10 @@ class Auctioneer(Supervisor):
         self_node = self.getFromDef("auctioneer")
         if self_node:
             data = self_node.getField("customData").getSFString()
-            if "SETUP:COVERAGE" in data:
-                self.setup = "COVERAGE"
+            if "SETUP:SWARM" in data:
+                self.setup = "SWARM"
+            elif "SETUP:BASELINE" in data:
+                self.setup = "BASELINE"
             elif "SETUP:AUCTION" in data:
                 self.setup = "AUCTION"
 
@@ -304,7 +306,7 @@ class Auctioneer(Supervisor):
         - Updates collector position cache.
         - Triggers an auction if needed and tasks remain.
         """
-        if self.setup == "COVERAGE": return
+        if self.setup == "SWARM" or self.setup == "BASELINE": return
 
         collector_id = msg.get("collector_id")
         pos = msg.get("pos")
@@ -325,7 +327,7 @@ class Auctioneer(Supervisor):
             self.start_auction()
 
     def handle_bid(self, msg):
-        if self.setup == "COVERAGE": return
+        if self.setup == "SWARM" or self.setup == "BASELINE": return
 
         collector_id = msg.get("collector_id")
         task_id = msg.get("task_id")

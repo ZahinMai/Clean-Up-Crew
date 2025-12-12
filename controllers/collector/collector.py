@@ -239,8 +239,8 @@ class Collector(Robot):
         self.logger.write(f"\nCollector Started | Mode: {setup_mode}\n")
 
         try:
-            if setup_mode == "COVERAGE":
-                run_coverage_setup(self, rubbish_list)
+            if setup_mode == "SWARM" or setup_mode == "BASELINE":
+                run_coverage_setup(self, rubbish_list, setup_mode)
             else:
                 # DEFAULT: AUCTION SETUP
                 dt_seconds = self.timestep / 1000.0

@@ -16,10 +16,16 @@ grid = get_map()
 coverage_planner = CoveragePlanner(grid)
 mission_waypoints = coverage_planner.generate_hardcoded_waypoints()
 
-collector_waypoints = { # TODO ADD BASELINE 
+swarm_waypoints = {
     "collector_1": list(reversed(mission_waypoints[14:])), # Bottom half of the grid
     "collector_2": mission_waypoints[:14], # Top half of the grid
 }
+
+baseline_waypoints = {
+    "collector_1": [], # No waypoints
+    "collector_2": mission_waypoints, # Full grid
+}
+print(mission_waypoints)
 
 def get_lidar_points(lidar, max_r=3.5, min_r=0.1):
     """Helper to get lidar points."""
@@ -36,9 +42,13 @@ def get_lidar_points(lidar, max_r=3.5, min_r=0.1):
         if min_r <= r <= max_r and math.isfinite(r)
     ]
 
-def run_coverage_setup(robot, rubbish_list):
+def run_coverage_setup(robot, rubbish_list, setup_mode):
     print(f"{robot.robot_id}: Starting COVERAGE mode logic.")
-    waypoints = collector_waypoints.get(robot.robot_id, [])
+    waypoints = []
+    if setup_mode == "SWARM":
+        waypoints = swarm_waypoints.get(robot.robot_id, [])
+    elif setup_mode == "BASELINE":
+        waypoints = baseline_waypoints.get(robot.robot_id, [])
     current_wp_idx = 0
 
     if waypoints:

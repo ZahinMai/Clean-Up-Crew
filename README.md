@@ -151,6 +151,10 @@ To change the auction strategy, edit `controllers/lib_shared/CONFIG.py`:
 auction_strategy = "nearest_task"
 ```
 
+To change the simulation setup, navigate to the `auctioneer` bot in the scene tree 
+and edit the customData field to be "SETUP:AUCTION", "SETUP:SWARM", "SETUP:BASELINE".
+The default simulation run is "SETUP:AUCTION".
+
 ## Logging & Output
 
 With each simulation run, a text file of the debug output from the console is saved automatically. The system uses a custom `DualLogger` to capture `stdout` and write it to markdown files for post-run analysis.
