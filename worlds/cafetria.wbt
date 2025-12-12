@@ -10,13 +10,15 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/chairs/protos/Chair.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/robotis/turtlebot/protos/TurtleBot3Burger.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/devices/robotis/protos/RobotisLds01.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/balls/protos/Ball.proto"
 
 WorldInfo {
   title "cafeteria"
 }
 Viewpoint {
-  orientation 0.4480232157887697 0.776461281544455 -0.4431513019010911 1.8312404386110328
-  position -6.105817137224098 2.1072703784446176 18.51190893071993
+  orientation 0.05137083110069159 0.996900827504543 -0.05958001202401501 1.4219103549831194
+  position -2.8170860771047863 1.4039128599998318 19.195718715738774
 }
 TexturedBackground {
   texture "entrance_hall"
@@ -35,6 +37,16 @@ Floor {
       scale 0.4 0.4
     }
   }
+}
+Ball {
+  translation 0 0.3 0.75
+  color 0 0 1
+}
+E-puck {
+  translation 0 0 0.75
+  name "spotter_vision"
+  controller "<none>"
+  supervisor TRUE
 }
 Wall {
   translation -4 0 0
@@ -335,7 +347,6 @@ DEF collector2 TurtleBot3Burger {
   ]
 }
 DEF human TurtleBot3Burger {
-  translation 0 0 0
   rotation 0.0027659462874998586 0.9417911680021912 0.3361870690764342 -0.004928828611680203
   name "pesky human"
   controller "Human_agent"
