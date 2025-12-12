@@ -16,8 +16,8 @@ coverage_planner = CoveragePlanner(grid)
 mission_waypoints = coverage_planner.generate_hardcoded_waypoints()
 
 collector_waypoints = { # TODO
-    "collector_1": mission_waypoints[-13:], # Last 13 waypoints i.e bottom half
-    "collector_2": list(reversed(mission_waypoints[:13])), # First 13 waypoints reversed i.e top half
+    "collector_1": list(reversed(mission_waypoints[14:])), # Bottom half of the grid
+    "collector_2": mission_waypoints[:14], # Top half of the grid
 }
 
 def get_lidar_points(lidar, max_r=3.5, min_r=0.1): # TODO

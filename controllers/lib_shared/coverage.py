@@ -54,20 +54,19 @@ class CoveragePlanner:
         Used as a fallback or simple coverage method.
         """
         # Define the grid lines
-        x_cols = [-3.6, -1.2, 1.2, 3.6]
-        y_rows = [5.1, 3.4, 1.7, 0.0, -1.7, -3.4, -5.1]
-
+        x_cols = [3.6, 1.2, -1.2, -3.6] 
+        y_rows = [5.1, 3.4, 1.7, 0.0, -1.7, -3.4, -5.1] 
+        
         final_waypoints = []
-
-        # Generate Lawnmower Path (Top to Bottom)
+        
         for i, y in enumerate(y_rows):
             if i % 2 == 0:
                 row_points = [(x, y) for x in x_cols]
             else:
                 row_points = [(x, y) for x in reversed(x_cols)]
-
+                
             final_waypoints.extend(row_points)
-
+            
         return final_waypoints
 
     def _decompose_grid(self):
