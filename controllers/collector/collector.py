@@ -60,7 +60,7 @@ class Collector(Robot):
         # Logging + communication
         self.logger = Logger(prefix=self.robot_id, enabled=True)
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.logger.start(f"nav_output_{timestamp}.md")
+        self.logger.start(f"nav_output_{self.robot_id}_{timestamp}.md")
         self.comm = Communication(self, CHANNEL)
 
         # Sensors
