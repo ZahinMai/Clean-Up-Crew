@@ -9,7 +9,7 @@ from typing import Tuple, List, Optional
 CELL_SIZE = 8/24  # meters per grid cell
 WORLD_MIN_X = -4.0
 WORLD_MIN_Y = -6.0
-# Cafeteria layout (# = wall, . = free space)
+# 8 x 12 World
 CAFETERIA_LAYOUT = """
 ########################
 #......................#
