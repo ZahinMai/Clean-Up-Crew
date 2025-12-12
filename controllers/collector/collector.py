@@ -93,12 +93,15 @@ class Collector(Robot):
 
 
         # For logging total dist coverage & time
+        self.start_time = None
         self.dist_covered = 0.0
-        self.start_time = None  # When first auction starts
     # ================================================================== #
     # Pose update & idle broadcast
     # ================================================================== #
     def update_pose(self):
+        if not self.start_time:
+            self.start_time = self.getTime()
+
         if self.gps.getSamplingPeriod() > 0:
             x, y, _ = self.gps.getValues()
             self.rx, self.ry = x, y
@@ -206,7 +209,6 @@ class Collector(Robot):
     def run(self):
     
         # == PERFORMANCE METRICS (dist covered, IDLE time, near misses) ==
-        self.start_time = 0.0
         prev_rx = None
         prev_ry = None
         dt_seconds = self.timestep / 1000.0 # ms -> s for easier calc
@@ -303,6 +305,7 @@ class Collector(Robot):
             self.logger.write("="*40 + "\n")
             self.logger.write(f"Total Idle Time:   {self.total_idle_time:.3f} s\n")
             self.logger.write(f"Collision Count:   {self.collision_count}\n")
+            self.logger.write(f"Distance covered:   {self.dist_covered}\n")
             self.logger.write(f"Time Elapsed:   {elapsed_time:.3f} s\n")
             self.logger.write("="*40 + "\n")
             self.logger.stop()

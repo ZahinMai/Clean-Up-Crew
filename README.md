@@ -31,7 +31,7 @@ The project has evolved into a robust Multi-Agent System (MAS) focusing on task 
 The system implements a **Single-Item Auction** protocol:
 
 1.  **Announcement:** The Supervisor broadcasts an `auction_start` message with the location of a trash item.
-2.  **Bidding:** Idle Collectors calculate the path cost (Euclidean/A\* distance) to the target and submit a `bid`.
+2.  **Bidding:** Idle Collectors calculate the path cost (Euclidean distance) to the target and submit a `bid`.
 3.  **Winner Selection:** The Supervisor waits for a timeout (2.0s), selects the lowest bidder, and sends an `assign_task` command.
 4.  **Task Chaining:** Robots can queue tasks if assigned multiple targets, preventing idle time.
 
