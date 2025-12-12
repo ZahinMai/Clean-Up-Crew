@@ -17,6 +17,7 @@ from lib_shared.communication import Communication
 from lib_shared.navigation import Navigator
 from lib_shared.dual_logger import Logger
 from lib_shared.CONFIG import AUCTION_STRATEGY, CAUTION_ZONE
+from collector_coverage import run_coverage_setup
 # ======================================================================
 # Config
 # ======================================================================
@@ -85,7 +86,7 @@ class Collector(Robot):
         self.last_idle_broadcast = 0.0
         self.idle_interval       = 2.0
 
-        self.logger.write(f"{self.robot_id}: Initialised in IDLE state")
+        self.logger.write(f"{self.robot_id}: Initialised and Waiting for Setup")
 
         # Inform auctioneer immediately (position updates next timestep)
         self.send_idle_status()
@@ -119,6 +120,25 @@ class Collector(Robot):
             self.logger.write(f"{self.robot_id}: broadcast IDLE ({self.rx:.2f}, {self.ry:.2f})\n")
         return sent
 
+    # Handshake / Setup Logic
+    def wait_for_setup(self):
+        """Blocks until the Supervisor broadcasts the setup configuration."""
+        self.logger.write("Waiting for configuration from Supervisor...")
+        while self.step(self.timestep) != -1:
+
+            while True:
+                msg = self.comm.receive()
+                if not msg:
+                    break
+
+                if msg.get("event") == "configure":
+                    setup = msg.get("setup", "AUCTION")
+                    rubbish = msg.get("rubbish_list", [])
+                    self.logger.write(f"Received Configuration: {setup}")
+                    return setup, rubbish
+
+        return "AUCTION", [] # Fallback
+    
     # ================================================================== #
     # Auction Handling
     # ================================================================== #
@@ -207,6 +227,10 @@ class Collector(Robot):
     # Main Loop
     # ================================================================== #
     def run(self):
+        # PERFORMANCE METRICS
+        self.start_time = self.getTime()
+        self.prev_rx = None
+        self.prev_ry = None
     
         # == PERFORMANCE METRICS (dist covered, IDLE time, near misses) ==
         prev_rx = None
@@ -214,99 +238,101 @@ class Collector(Robot):
         dt_seconds = self.timestep / 1000.0 # ms -> s for easier calc
         self.total_idle_time = 0.0
         self.collision_count = 0
-        self.is_in_collision = False  # To debounce collision counting
-        # ===============================================================
+        self.is_in_collision = False # To debounce collision counting
+        self.dist_covered = 0.0
+
         
-        self.logger.write(f"\nCollector Started | Mode: Auction-Based\n")
+        setup_mode, rubbish_list = self.wait_for_setup()
+
+        self.logger.write(f"\nCollector Started | Mode: {setup_mode}\n")
+
         try:
-            while self.step(self.timestep) != -1:
-                self.update_pose()
-                self.handle_messages()
-                
-                # =========== log distance covered =========== #
-                if prev_rx is not None and prev_ry is not None:
-                    step_dist = math.hypot(self.rx - prev_rx, self.ry - prev_ry)
-                    self.dist_covered += step_dist
+            if setup_mode == "SWARM" or setup_mode == "BASELINE":
+                run_coverage_setup(self, rubbish_list, setup_mode)
+            else:
+                # DEFAULT: AUCTION SETUP
+                dt_seconds = self.timestep / 1000.0
 
-                prev_rx = self.rx
-                prev_ry = self.ry
-                # =========================================== #
-
-                if self.state == "IDLE":
-                    self.total_idle_time += dt_seconds
-                    self.lm.setVelocity(0.0)
-                    self.rm.setVelocity(0.0)
-
-                    now = self.getTime()
-                    if now - self.last_idle_broadcast >= self.idle_interval:
-                        self.send_idle_status()
-                        self.last_idle_broadcast = now
-
-                elif self.state == "NAVIGATING":
-                    now = self.getTime()
-                    lidar_pts = get_lidar_points(self.lidar)
+                while self.step(self.timestep) != -1:
+                    self.update_pose()
+                    self.handle_messages()
                     
-                    # ========= log (near) collisions ========= #
-                    # Check if any point is within the danger threshold
-                    min_dist = float('inf')
-                    if lidar_pts:
-                        # lidar_pts is list of (x, y) tuples
-                        min_dist = min(math.hypot(x, y) for x, y in lidar_pts)
-                    
-                    if min_dist < CAUTION_ZONE:
-                        if not self.is_in_collision:
-                            self.collision_count += 1
-                            self.is_in_collision = True
-                    else:
-                        # Reset flag only when safely away
-                        self.is_in_collision = False
-                    # =========================================== #
+                    # Metric: Distance 
+                    if self.prev_rx is not None and self.prev_ry is not None:
+                        step_dist = math.hypot(self.rx - self.prev_rx, self.ry - self.prev_ry)
+                        self.dist_covered += step_dist
+                    self.prev_rx = self.rx
+                    self.prev_ry = self.ry
 
-                    v, w, moving = self.nav.update(
-                        pose=(self.rx, self.ry, self.yaw),
-                        lidar_pts=lidar_pts,
-                        now=now,
-                    )
-
-                    wl = (v + 0.5*w*AXLE_LENGTH) / WHEEL_RADIUS
-                    wr = (v - 0.5*w*AXLE_LENGTH) / WHEEL_RADIUS
-
-                    vmax = min(self.lm.getMaxVelocity(), self.rm.getMaxVelocity())
-                    wl = max(-vmax, min(vmax, wl))
-                    wr = max(-vmax, min(vmax, wr))
-
-                    self.lm.setVelocity(wl)
-                    self.rm.setVelocity(wr)
-
-                    if not moving:
-                        self.logger.write(f"{self.robot_id}: Task {self.current_task_id} COMPLETE\n")
-
-                        # stop
+                    if self.state == "IDLE":
+                        self.total_idle_time += dt_seconds
                         self.lm.setVelocity(0.0)
                         self.rm.setVelocity(0.0)
 
-                        # notify auctioneer
-                        self.comm.send({
-                            "event": "collected",
-                            "collector_id": self.robot_id,
-                            "task_id": self.current_task_id,
-                            "x": self.rx,
-                            "y": self.ry,
-                        })
+                        now = self.getTime()
+                        if now - self.last_idle_broadcast >= self.idle_interval:
+                            self.send_idle_status()
+                            self.last_idle_broadcast = now
 
-                        self.nav.clear_path()
-                        self._start_next_task_if_any()
+                    elif self.state == "NAVIGATING":
+                        now = self.getTime()
+                        lidar_pts = get_lidar_points(self.lidar)
+                        
+                        # Metric: Collision 
+                        min_dist = float('inf')
+                        if lidar_pts:
+                            min_dist = min(math.hypot(x, y) for x, y in lidar_pts)
+                        
+                        if min_dist < CAUTION_ZONE:
+                            if not self.is_in_collision:
+                                self.collision_count += 1
+                                self.is_in_collision = True
+                        else:
+                            self.is_in_collision = False
+
+                        v, w, moving = self.nav.update(
+                            pose=(self.rx, self.ry, self.yaw),
+                            lidar_pts=lidar_pts,
+                            now=now,
+                        )
+
+                        wl = (v + 0.5*w*AXLE_LENGTH) / WHEEL_RADIUS
+                        wr = (v - 0.5*w*AXLE_LENGTH) / WHEEL_RADIUS
+
+                        vmax = min(self.lm.getMaxVelocity(), self.rm.getMaxVelocity())
+                        wl = max(-vmax, min(vmax, wl))
+                        wr = max(-vmax, min(vmax, wr))
+
+                        self.lm.setVelocity(wl)
+                        self.rm.setVelocity(wr)
+
+                        if not moving:
+                            self.logger.write(f"{self.robot_id}: Task {self.current_task_id} COMPLETE\n")
+                            self.lm.setVelocity(0.0)
+                            self.rm.setVelocity(0.0)
+                            self.comm.send({
+                                "event": "collected",
+                                "collector_id": self.robot_id,
+                                "task_id": self.current_task_id,
+                                "x": self.rx,
+                                "y": self.ry,
+                            })
+                            self.nav.clear_path()
+                            self._start_next_task_if_any()
 
         finally:
-            # ========= log performance metrics ========= #
+            # LOGGING PERFORMANCE METRICS
             elapsed_time = self.getTime() - self.start_time
+            
             self.logger.write("\n" + "="*40 + "\n")
-            self.logger.write(f"PERFORMANCE METRICS FOR {AUCTION_STRATEGY.upper()}\n")
+            self.logger.write(f"PERFORMANCE METRICS FOR {setup_mode} | {AUCTION_STRATEGY.upper()}\n")
             self.logger.write("="*40 + "\n")
             self.logger.write(f"Total Idle Time:   {self.total_idle_time:.3f} s\n")
             self.logger.write(f"Collision Count:   {self.collision_count}\n")
             self.logger.write(f"Distance covered:   {self.dist_covered}\n")
             self.logger.write(f"Time Elapsed:   {elapsed_time:.3f} s\n")
+            self.logger.write(f"Distance Covered:  {self.dist_covered:.3f} m\n")
+            self.logger.write(f"Time Elapsed:      {elapsed_time:.3f} s\n")
             self.logger.write("="*40 + "\n")
             self.logger.stop()
 

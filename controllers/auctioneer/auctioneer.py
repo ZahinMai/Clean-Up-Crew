@@ -84,8 +84,42 @@ class Auctioneer(Supervisor):
         # Collector state (for nearest-task strategy), collector_id -> (x, z)
         self.collector_positions = {}
 
+        self.setup = "AUCTION" # Default
+        self_node = self.getFromDef("auctioneer")
+        if self_node:
+            data = self_node.getField("customData").getSFString()
+            if "SETUP:SWARM" in data:
+                self.setup = "SWARM"
+            elif "SETUP:BASELINE" in data:
+                self.setup = "BASELINE"
+            elif "SETUP:AUCTION" in data:
+                self.setup = "AUCTION"
+
+        self.logger.write(f"Auctioneer setup: {self.setup}\n")
         self.logger.write("Auctioneer initialised\n")
         self.spawn_rubbish()
+
+        self.broadcast_setup()
+
+    # -------------------------------------------------------------------------
+    # CONFIGURATION BROADCAST
+    # -------------------------------------------------------------------------
+    def broadcast_setup(self):
+        """Sends the current setup and full rubbish list to all collectors for the coverage setup."""
+        clean_list = []
+        for i, (x, y, _) in enumerate(self.trash_locations):
+            clean_list.append({"id": i, "x": x, "y": y})
+
+        msg = {
+            "event": "configure",
+            "setup": self.setup,
+            "rubbish_list": clean_list
+        }
+
+        # Send multiple times to ensure collectors wake up and receive it
+        for _ in range(5):
+            self.send_message(msg)
+            self.step(self.timestep)
 
     # -------------------------------------------------------------------------
     # TRASH INITIALISATION / CLEANUP
@@ -229,6 +263,8 @@ class Auctioneer(Supervisor):
         - Updates collector position cache.
         - Triggers an auction if needed and tasks remain.
         """
+        if self.setup == "SWARM" or self.setup == "BASELINE": return
+
         collector_id = msg.get("collector_id")
         pos = msg.get("pos")
 
@@ -248,6 +284,8 @@ class Auctioneer(Supervisor):
             self.start_auction()
 
     def handle_bid(self, msg):
+        if self.setup == "SWARM" or self.setup == "BASELINE": return
+
         collector_id = msg.get("collector_id")
         task_id = msg.get("task_id")
         cost = msg.get("cost")
@@ -370,6 +408,9 @@ class Auctioneer(Supervisor):
         self.logger.write("Auctioneer running...\n")
         try:
             while self.step(self.timestep) != -1:
+                if self.getTime() % 5.0 < (self.timestep / 1000.0):
+                    self.broadcast_setup()
+
                 for msg in self.receive_messages():
                     event = msg.get("event")
                     if event == "idle":
@@ -379,7 +420,8 @@ class Auctioneer(Supervisor):
                     elif event == "collected":
                         self.handle_collected(msg)
 
-                self.finish_auction_if_ready()
+                if self.setup == "AUCTION":
+                    self.finish_auction_if_ready()
 
         finally:
             self.logger.stop()
