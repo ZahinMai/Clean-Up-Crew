@@ -36,7 +36,7 @@ FIXED_TRASH_LOCATIONS = [
     (-0.167,  5.167),
 ]
 
-FIXED_TRASH_LOCATIONS2 = [
+FIXED_TRASH_LOCATIONS1 = [
     ( 0.500,  2.833),
     (-2.500, -4.167),
     ( 2.500, -3.833),
@@ -49,18 +49,19 @@ FIXED_TRASH_LOCATIONS2 = [
     (-0.500,  4.167),
 ]
 
-FIXED_TRASH_LOCATIONS3 = [
-    ( 1.500,  3.167),
-    (-1.500,  3.167),
-    ( 1.500, -3.167),
-    (-1.500, -3.167),
-    ( 0.833,  0.833),
-    (-0.833,  0.833),
-    ( 0.833, -0.833),
-    (-0.833, -0.833),
-    ( 2.167,  0.833),
-    (-2.167, -0.833),
+FIXED_TRASH_LOCATIONS2 = [
+    ( 1.167,  2.167),
+    (-1.167,  2.167),
+    ( 1.833, -2.167),
+    (-1.833, -2.167),
+    ( 0.167,  4.833),
+    (-0.167, -4.833),
+    ( 3.167,  0.833),
+    (-3.167, -0.833),
+    ( 2.833,  1.500),
+    (-2.833, -1.500),
 ]
+
 
 TRASH_TEMPLATE = """
 DEF TRASH_%d Solid {
@@ -140,7 +141,7 @@ class Auctioneer(Supervisor):
 
     def _spawn_fixed_rubbish(self):
         """Spawns rubbish at predefined fixed locations."""
-        for i, (x, y) in enumerate(FIXED_TRASH_LOCATIONS2):
+        for i, (x, y) in enumerate(FIXED_TRASH_LOCATIONS1):
             # Track this rubbish location
             self.trash_locations.append((x, y, f"rubbish at ({x}, {y})"))
 
