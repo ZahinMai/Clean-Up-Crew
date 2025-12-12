@@ -18,7 +18,7 @@ WorldInfo {
 }
 Viewpoint {
   orientation 0.07672771958042274 0.9930716056302117 -0.08900361306723091 1.426963053081174
-  position -1.067032112985663 1.1348820099692514 7.535066668418603
+  position -2.8170860771047863 1.4039128599998318 19.195718715738774
 }
 TexturedBackground {
   texture "entrance_hall"
@@ -45,7 +45,8 @@ Ball {
 E-puck {
   translation 0 0 0.75
   name "spotter_vision"
-  controller "spotter_vision"
+  controller "<none>"
+  supervisor TRUE
 }
 Wall {
   translation -4 0 0
