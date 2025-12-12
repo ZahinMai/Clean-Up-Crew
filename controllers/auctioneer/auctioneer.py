@@ -15,7 +15,7 @@ if os.path.dirname(os.path.dirname(__file__)) not in sys.path:
 
 from lib_shared.dual_logger import Logger
 from lib_shared.map_module import get_map
-from lib_shared.CONFIG import AUCTION_STRATEGY, TRASH_SPAWN_STRATEGY, FIXED_TRASH_LOCATIONS
+from lib_shared.CONFIG import AUCTION_STRATEGY, TRASH_SPAWN_STRATEGY, FIXED_TRASH_LOCATIONS, TRASH_LAYOUT
 
 
 # How long to wait for bids before closing an auction
@@ -133,7 +133,7 @@ class Auctioneer(Supervisor):
 
     def _spawn_fixed_rubbish(self):
         """Spawns rubbish at predefined fixed locations."""
-        for i, (x, y) in enumerate(FIXED_TRASH_LOCATIONS):
+        for i, (x, y) in enumerate(FIXED_TRASH_LOCATIONS[TRASH_LAYOUT]):
             # Track this rubbish location
             self.trash_locations.append((x, y, f"rubbish at ({x}, {y})"))
 

@@ -16,7 +16,7 @@ if os.path.dirname(os.path.dirname(__file__)) not in sys.path:
 from lib_shared.communication import Communication
 from lib_shared.navigation import Navigator
 from lib_shared.dual_logger import Logger
-from lib_shared.CONFIG import AUCTION_STRATEGY, CAUTION_ZONE
+from lib_shared.CONFIG import AUCTION_STRATEGY, CAUTION_ZONE, TRASH_LAYOUT
 from collector_coverage import run_coverage_setup
 # ======================================================================
 # Config
@@ -227,14 +227,10 @@ class Collector(Robot):
     # Main Loop
     # ================================================================== #
     def run(self):
-        # PERFORMANCE METRICS
+        # == PERFORMANCE METRICS (dist covered, IDLE time, near misses) ==
         self.start_time = self.getTime()
         self.prev_rx = None
         self.prev_ry = None
-    
-        # == PERFORMANCE METRICS (dist covered, IDLE time, near misses) ==
-        prev_rx = None
-        prev_ry = None
         dt_seconds = self.timestep / 1000.0 # ms -> s for easier calc
         self.total_idle_time = 0.0
         self.collision_count = 0
@@ -325,14 +321,12 @@ class Collector(Robot):
             elapsed_time = self.getTime() - self.start_time
             
             self.logger.write("\n" + "="*40 + "\n")
-            self.logger.write(f"PERFORMANCE METRICS FOR {setup_mode} | {AUCTION_STRATEGY.upper()}\n")
+            self.logger.write(f"PERFORMANCE METRICS FOR {setup_mode} | {AUCTION_STRATEGY.upper()} on {TRASH_LAYOUT}\n")
             self.logger.write("="*40 + "\n")
             self.logger.write(f"Total Idle Time:   {self.total_idle_time:.3f} s\n")
             self.logger.write(f"Collision Count:   {self.collision_count}\n")
-            self.logger.write(f"Distance covered:   {self.dist_covered}\n")
+            self.logger.write(f"Distance covered:   {self.dist_covered:.3f}\n")
             self.logger.write(f"Time Elapsed:   {elapsed_time:.3f} s\n")
-            self.logger.write(f"Distance Covered:  {self.dist_covered:.3f} m\n")
-            self.logger.write(f"Time Elapsed:      {elapsed_time:.3f} s\n")
             self.logger.write("="*40 + "\n")
             self.logger.stop()
 
