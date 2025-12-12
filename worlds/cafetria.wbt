@@ -10,13 +10,15 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/chairs/protos/Chair.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/robotis/turtlebot/protos/TurtleBot3Burger.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/devices/robotis/protos/RobotisLds01.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/balls/protos/Ball.proto"
 
 WorldInfo {
   title "cafeteria"
 }
 Viewpoint {
-  orientation 0.4480232157887697 0.776461281544455 -0.4431513019010911 1.8312404386110328
-  position -6.105817137224098 2.1072703784446176 18.51190893071993
+  orientation 0.07672771958042274 0.9930716056302117 -0.08900361306723091 1.426963053081174
+  position -1.067032112985663 1.1348820099692514 7.535066668418603
 }
 TexturedBackground {
   texture "entrance_hall"
@@ -35,6 +37,15 @@ Floor {
       scale 0.4 0.4
     }
   }
+}
+Ball {
+  translation 0 0.3 0.75
+  color 0 0 1
+}
+E-puck {
+  translation 0 0 0.75
+  name "spotter_vision"
+  controller "spotter_vision"
 }
 Wall {
   translation -4 0 0
@@ -335,7 +346,6 @@ DEF collector2 TurtleBot3Burger {
   ]
 }
 DEF human TurtleBot3Burger {
-  translation 0 0 0
   rotation 0.0027659462874998586 0.9417911680021912 0.3361870690764342 -0.004928828611680203
   name "pesky human"
   controller "Human_agent"
@@ -359,18 +369,21 @@ DEF auctioneer TurtleBot3Burger {
   rotation -0.0011816475225585035 0.0012666173949227567 0.9999984996936282 1.5645174478508965
   name "auctioneer"
   controller "auctioneer"
+  supervisor TRUE
   extensionSlot [
     RobotisLds01 {
     }
-    InertialUnit {}
-    GPS { }
+    InertialUnit {
+    }
+    GPS {
+    }
     Emitter {
       channel 1
     }
     Receiver {
       channel 1
     }
-    Camera{}
+    Camera {
+    }
   ]
-  supervisor TRUE
 }
