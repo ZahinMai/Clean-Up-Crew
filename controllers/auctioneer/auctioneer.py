@@ -15,11 +15,8 @@ if os.path.dirname(os.path.dirname(__file__)) not in sys.path:
 
 from lib_shared.dual_logger import Logger
 from lib_shared.map_module import get_map
-from lib_shared.CONFIG import auction_strategy, trash_spawn_strategy
+from lib_shared.CONFIG import AUCTION_STRATEGY, TRASH_SPAWN_STRATEGY
 
-# Set these in CONFIG.py
-SPAWN_STRATEGY = trash_spawn_strategy  # "random" | "fixed"
-AUCTION_STRATEGY = auction_strategy  # "sequential" | "nearest_task" | "random"
 
 # How long to wait for bids before closing an auction
 AUCTION_WAIT_TIME = 2.0  # in seconds
@@ -78,10 +75,6 @@ class Auctioneer(Supervisor):
         # Map (if needed for spawn logic / visualisation)
         self.occupancy_grid = get_map()
 
-        # Timing
-        self.start_time = None  # When first auction starts
-        self.end_time = None    # When all tasks completed
-
         # Communication devices
         self.receiver = self.getDevice("receiver")
         self.receiver.enable(self.timestep)
@@ -112,10 +105,8 @@ class Auctioneer(Supervisor):
     # TRASH INITIALISATION / CLEANUP
     # -------------------------------------------------------------------------
     def spawn_rubbish(self):
-        """Spawns rubbish based on SPAWN_STRATEGY configuration."""
-        self.logger.write(f"Spawning rubbish using strategy: {SPAWN_STRATEGY}\n")
-
-        if SPAWN_STRATEGY == "fixed":
+        """Spawns rubbish based on configuration."""
+        if TRASH_SPAWN_STRATEGY == "fixed":
             self._spawn_fixed_rubbish()
         else:  # "random" or any other value defaults to random
             self._spawn_random_rubbish()
@@ -296,7 +287,7 @@ class Auctioneer(Supervisor):
         if task_id in self.completed_task_ids:
             return
 
-        msg_str = f"OK {collector_id} COMPLETED task {task_id}"
+        msg_str = f"OK {collector_id} COMPLETED task {task_id}\n"
         self.logger.write(msg_str)
 
         self.completed_task_ids.add(task_id)
@@ -308,9 +299,7 @@ class Auctioneer(Supervisor):
 
         # Check for termination
         if len(self.completed_task_ids) >= len(self.trash_locations):
-            elapsed_time = self.getTime() - self.start_time
             self.logger.write("=" * 70 + "\n")
-            self.logger.write(f"Auction Strategy: {AUCTION_STRATEGY},  Time Elapsed: {elapsed_time}\n")
             self.logger.write("ALL TASKS COMPLETED. SAVING LOGS & EXITING.\n")
             self.logger.write("=" * 70 + "\n")
             self.logger.stop()
@@ -330,14 +319,10 @@ class Auctioneer(Supervisor):
         x, z, name = self.trash_locations[task_id]
         self.bids_received[task_id] = []
         
-        # Record start time on first auction ONLY
-        if self.start_time is None:
-            self.start_time = self.getTime()
-            self.logger.write(f"TIMER START: {self.start_time:.2f}s")
         
         self.logger.write("-" * 50)
         self.logger.write('\n')
-        self.logger.write(f"**AUCTION #{task_id}**: {name} at ({x:.2f}, {z:.2f})\n")
+        self.logger.write(f"**AUCTION #{task_id}**: {name}")
 
         self.send_message({
             "event": "auction_start",

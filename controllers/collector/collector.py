@@ -9,17 +9,17 @@
 from controller import Robot
 import math, os, sys, datetime
 
-# ---- Shared Library Import ---- #
+# ==== Shared Library Import ==== #
 if os.path.dirname(os.path.dirname(__file__)) not in sys.path:
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from lib_shared.communication import Communication
 from lib_shared.navigation import Navigator
 from lib_shared.dual_logger import Logger
-
-# ----------------------------------------------------------------------
+from lib_shared.CONFIG import AUCTION_STRATEGY, CAUTION_ZONE
+# ======================================================================
 # Config
-# ----------------------------------------------------------------------
+# ======================================================================
 WHEEL_RADIUS = 0.033
 AXLE_LENGTH  = 0.16
 CHANNEL      = 1
@@ -91,9 +91,13 @@ class Collector(Robot):
         self.send_idle_status()
         self.last_idle_broadcast = self.getTime()
 
-    # ------------------------------------------------------------------ #
+
+        # For logging total dist coverage & time
+        self.dist_covered = 0.0
+        self.start_time = None  # When first auction starts
+    # ================================================================== #
     # Pose update & idle broadcast
-    # ------------------------------------------------------------------ #
+    # ================================================================== #
     def update_pose(self):
         if self.gps.getSamplingPeriod() > 0:
             x, y, _ = self.gps.getValues()
@@ -109,12 +113,12 @@ class Collector(Robot):
             "pos": [self.rx, self.ry],
         })
         if sent:
-            self.logger.write(f"{self.robot_id}: broadcast IDLE ({self.rx:.2f}, {self.ry:.2f})")
+            self.logger.write(f"{self.robot_id}: broadcast IDLE ({self.rx:.2f}, {self.ry:.2f})\n")
         return sent
 
-    # ------------------------------------------------------------------ #
+    # ================================================================== #
     # Auction Handling
-    # ------------------------------------------------------------------ #
+    # ================================================================== #
     def handle_auction_start(self, msg):
         """Robots always bid; auctioneer decides assignment."""
         task_id = msg.get("task_id")
@@ -132,7 +136,7 @@ class Collector(Robot):
             "task_id": task_id,
             "cost": cost,
         })
-        self.logger.write(f"{self.robot_id}: BID {cost:.2f} for task {task_id}")
+        self.logger.write(f"{self.robot_id}: BID {cost:.2f} for task {task_id}\n")
 
     def handle_task_assignment(self, msg):
         """Start immediately if idle; else queue for later."""
@@ -144,24 +148,24 @@ class Collector(Robot):
         z = msg.get("target_z")
 
         if None in (task_id, x, z):
-            self.logger.write(f"{self.robot_id}: Invalid assignment message")
+            self.logger.write(f"{self.robot_id}: Invalid assignment message\n")
             return
 
         # Start immediately
         if self.state == "IDLE" and self.current_task_id is None:
-            self.logger.write(f"{self.robot_id}: Assigned task {task_id} (start now)")
+            self.logger.write(f"{self.robot_id}: Assigned task {task_id} (start now)\n")
             self.current_task_id = task_id
 
             if self.nav.plan_path((self.rx, self.ry), (x, z)):
                 self.state = "NAVIGATING"
-                self.logger.write(f"{self.robot_id}: Path planned -> NAVIGATING")
+                self.logger.write(f"{self.robot_id}: Path planned -> NAVIGATING\n")
             else:
-                self.logger.write(f"{self.robot_id}: Failed to plan path for task {task_id}")
+                self.logger.write(f"{self.robot_id}: Failed to plan path for task {task_id}\n")
                 self.current_task_id = None
             return
 
         # Else queue it
-        self.logger.write(f"{self.robot_id}: Queued task {task_id}")
+        self.logger.write(f"{self.robot_id}: Queued task {task_id}\n")
         self.pending_tasks.append((task_id, x, z))
 
     def handle_messages(self):
@@ -172,9 +176,9 @@ class Collector(Robot):
             elif event == "assign_task":
                 self.handle_task_assignment(msg)
 
-    # ------------------------------------------------------------------ #
+    # ================================================================== #
     # Task Chaining
-    # ------------------------------------------------------------------ #
+    # ================================================================== #
     def _start_next_task_if_any(self):
         if not self.pending_tasks:
             # No more work
@@ -183,31 +187,51 @@ class Collector(Robot):
             self.nav.clear_path()
             self.send_idle_status()
             self.last_idle_broadcast = self.getTime()
-            self.logger.write(f"{self.robot_id}: Queue empty â†’ IDLE")
+            self.logger.write(f"{self.robot_id}: Queue empty. IDLE")
             return
 
         task_id, x, z = self.pending_tasks.pop(0)
-        self.logger.write(f"{self.robot_id}: Starting queued task {task_id}")
+        self.logger.write(f"{self.robot_id}: Starting queued task {task_id}\n")
 
         self.current_task_id = task_id
         if self.nav.plan_path((self.rx, self.ry), (x, z)):
             self.state = "NAVIGATING"
         else:
-            self.logger.write(f"{self.robot_id}: Failed to plan queued task {task_id}")
+            self.logger.write(f"{self.robot_id}: Failed to plan queued task {task_id}\n")
             self._start_next_task_if_any()  # try next one
 
-    # ------------------------------------------------------------------ #
+    # ================================================================== #
     # Main Loop
-    # ------------------------------------------------------------------ #
+    # ================================================================== #
     def run(self):
+    
+        # == PERFORMANCE METRICS (dist covered, IDLE time, near misses) ==
+        self.start_time = 0.0
+        prev_rx = None
+        prev_ry = None
+        dt_seconds = self.timestep / 1000.0 # ms -> s for easier calc
+        self.total_idle_time = 0.0
+        self.collision_count = 0
+        self.is_in_collision = False  # To debounce collision counting
+        # ===============================================================
+        
         self.logger.write(f"\nCollector Started | Mode: Auction-Based\n")
-
         try:
             while self.step(self.timestep) != -1:
                 self.update_pose()
                 self.handle_messages()
+                
+                # =========== log distance covered =========== #
+                if prev_rx is not None and prev_ry is not None:
+                    step_dist = math.hypot(self.rx - prev_rx, self.ry - prev_ry)
+                    self.dist_covered += step_dist
+
+                prev_rx = self.rx
+                prev_ry = self.ry
+                # =========================================== #
 
                 if self.state == "IDLE":
+                    self.total_idle_time += dt_seconds
                     self.lm.setVelocity(0.0)
                     self.rm.setVelocity(0.0)
 
@@ -219,6 +243,22 @@ class Collector(Robot):
                 elif self.state == "NAVIGATING":
                     now = self.getTime()
                     lidar_pts = get_lidar_points(self.lidar)
+                    
+                    # ========= log (near) collisions ========= #
+                    # Check if any point is within the danger threshold
+                    min_dist = float('inf')
+                    if lidar_pts:
+                        # lidar_pts is list of (x, y) tuples
+                        min_dist = min(math.hypot(x, y) for x, y in lidar_pts)
+                    
+                    if min_dist < CAUTION_ZONE:
+                        if not self.is_in_collision:
+                            self.collision_count += 1
+                            self.is_in_collision = True
+                    else:
+                        # Reset flag only when safely away
+                        self.is_in_collision = False
+                    # =========================================== #
 
                     v, w, moving = self.nav.update(
                         pose=(self.rx, self.ry, self.yaw),
@@ -237,7 +277,7 @@ class Collector(Robot):
                     self.rm.setVelocity(wr)
 
                     if not moving:
-                        self.logger.write(f"{self.robot_id}: Task {self.current_task_id} COMPLETE")
+                        self.logger.write(f"{self.robot_id}: Task {self.current_task_id} COMPLETE\n")
 
                         # stop
                         self.lm.setVelocity(0.0)
@@ -256,6 +296,15 @@ class Collector(Robot):
                         self._start_next_task_if_any()
 
         finally:
+            # ========= log performance metrics ========= #
+            elapsed_time = self.getTime() - self.start_time
+            self.logger.write("\n" + "="*40 + "\n")
+            self.logger.write(f"PERFORMANCE METRICS FOR {AUCTION_STRATEGY.upper()}\n")
+            self.logger.write("="*40 + "\n")
+            self.logger.write(f"Total Idle Time:   {self.total_idle_time:.3f} s\n")
+            self.logger.write(f"Collision Count:   {self.collision_count}\n")
+            self.logger.write(f"Time Elapsed:   {elapsed_time:.3f} s\n")
+            self.logger.write("="*40 + "\n")
             self.logger.stop()
 
 

@@ -12,10 +12,10 @@ from typing import List, Tuple, Optional
 from .global_planner import AStarPlanner
 from .map_module import visualise_map, get_map
 from .obstacle_avoidance import SimpleAvoidance
-
+from .CONFIG import DANGER_ZONE, CAUTION_ZONE, SLOW_ZONE
 class Navigator:
     """Path planning & following for differential-drive robots."""
-    def __init__(self, map_inflation: int = 0, vis_period: float = 5.0, max_v: float = 1.5, max_w: float = 2.0):
+    def __init__(self, map_inflation: int = 0, vis_period: float = 8.0, max_v: float = 1.5, max_w: float = 2.0):
         # Map + inflated planning grid
         self.grid = get_map()
         self.plan_grid = self.grid.inflate_obstacles(map_inflation)
@@ -104,10 +104,6 @@ class Navigator:
                 dist = math.hypot(lx, ly)
                 min_obstacle_dist = min(min_obstacle_dist, dist)
         
-        # Thresholds for behavior switching
-        DANGER_ZONE = 0.1      # meters - stop forward motion
-        CAUTION_ZONE = 0.2     # meters - slow down significantly
-        SLOW_ZONE = 0.3        # meters - reduce speed
         
         # Check if obstacle is in front (within ±45 degrees)
         obstacle_in_front = False
