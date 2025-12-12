@@ -27,18 +27,17 @@ AUCTION_WAIT_TIME = 2.0  # in seconds
 # Fixed trash locations (x, z coordinates)
 # Only used when SPAWN_STRATEGY = "fixed"
 FIXED_TRASH_LOCATIONS = [
-    (0.5, 0.5),
-    (1.0, 1.0),
-    (1.5, 0.5),
-    (0.5, 1.5),
-    (2.0, 2.0),
-    (2.5, 1.5),
-    (1.0, 2.5),
-    (3.0, 1.0),
-    (1.5, 3.0),
-    (3.0, 3.0),
+    (-1.167, -0.833),
+    ( 3.167,  5.167),
+    (-3.167,  5.167),
+    ( 3.167, -5.167),
+    (-3.167, -5.167),
+    ( 1.833,  1.500),
+    ( 2.500, -1.833),
+    (-3.167,  1.833),
+    (-0.167, -5.167),
+    (-0.167,  5.167),
 ]
-
 TRASH_TEMPLATE = """
 DEF TRASH_%d Solid {
   translation %f %f 0.1
