@@ -9,18 +9,19 @@ from lib_shared.map_module import get_map
 
 WHEEL_RADIUS = 0.033
 AXLE_LENGTH = 0.16
+CAUTION_ZONE = 0.5 # Define threshold for collision counting
 
 # HARDCODED WAYPOINTS 
 grid = get_map()
 coverage_planner = CoveragePlanner(grid)
 mission_waypoints = coverage_planner.generate_hardcoded_waypoints()
 
-collector_waypoints = { # TODO
+collector_waypoints = { # TODO ADD BASELINE 
     "collector_1": list(reversed(mission_waypoints[14:])), # Bottom half of the grid
     "collector_2": mission_waypoints[:14], # Top half of the grid
 }
 
-def get_lidar_points(lidar, max_r=3.5, min_r=0.1): # TODO
+def get_lidar_points(lidar, max_r=3.5, min_r=0.1):
     """Helper to get lidar points."""
     if not lidar: return []
     try: ranges = lidar.getRangeImage()
@@ -37,7 +38,7 @@ def get_lidar_points(lidar, max_r=3.5, min_r=0.1): # TODO
 
 def run_coverage_setup(robot, rubbish_list):
     print(f"{robot.robot_id}: Starting COVERAGE mode logic.")
-    waypoints = collector_waypoints[robot.robot_id]
+    waypoints = collector_waypoints.get(robot.robot_id, [])
     current_wp_idx = 0
 
     if waypoints:
@@ -48,7 +49,14 @@ def run_coverage_setup(robot, rubbish_list):
     # Main Loop
     while robot.step(robot.timestep) != -1:
         robot.update_pose()
-        robot.handle_messages() # Handle incoming messages
+        robot.handle_messages() 
+
+        # METRIC: Distance Covered
+        if robot.prev_rx is not None and robot.prev_ry is not None:
+            step_dist = math.hypot(robot.rx - robot.prev_rx, robot.ry - robot.prev_ry)
+            robot.dist_covered += step_dist
+        robot.prev_rx = robot.rx
+        robot.prev_ry = robot.ry
 
         # DISTANCE BASED RUBBISH DETECTION
         for item in rubbish_list:
@@ -58,13 +66,15 @@ def run_coverage_setup(robot, rubbish_list):
 
             dist = math.hypot(robot.rx - item['x'], robot.ry - item['y'])
 
-            # Detection Threshold
             if dist < 0.5:
                 print(f"!!! {robot.robot_id} DETECTED RUBBISH {r_id} !!!")
 
                 # Stop briefly
                 robot.lm.setVelocity(0)
                 robot.rm.setVelocity(0)
+                
+                # Update idle time for the stop
+                robot.total_idle_time += (robot.timestep / 1000.0)
 
                 # Send collected message
                 robot.comm.send({
@@ -74,14 +84,25 @@ def run_coverage_setup(robot, rubbish_list):
                     "x": robot.rx,
                     "y": robot.ry,
                 })
-
                 collected_ids.add(r_id)
-
                 print(f"-> Sent collection confirmation for {r_id}")
 
-        # NAVIGATION
+        # NAVIGATION & COLLISION METRICS
         now = robot.getTime()
         lidar_pts = get_lidar_points(robot.lidar)
+
+        # METRIC: Collision Counting
+        min_dist = float('inf')
+        if lidar_pts:
+            min_dist = min(math.hypot(x, y) for x, y in lidar_pts)
+        
+        if min_dist < CAUTION_ZONE:
+            if not robot.is_in_collision:
+                robot.collision_count += 1
+                robot.is_in_collision = True
+        else:
+            robot.is_in_collision = False
+        # ----------------------------------
 
         # Update Navigator
         v, w, moving = robot.nav.update(
@@ -99,7 +120,6 @@ def run_coverage_setup(robot, rubbish_list):
 
         # WAYPOINT SWITCHING
         if not moving:
-            # Reached current waypoint
             current_wp_idx += 1
             if current_wp_idx < len(waypoints):
                 print(f"{robot.robot_id}: Moving to WP {current_wp_idx} {waypoints[current_wp_idx]}")
@@ -107,7 +127,10 @@ def run_coverage_setup(robot, rubbish_list):
                 if not success:
                     print(f"Plan failed to WP {current_wp_idx}, skipping...")
             else:
-                # If finished pattern, loop back to start to ensure full coverage
-                print(f"{robot.robot_id}: Pattern complete. Restarting pattern.")
-                current_wp_idx = 0
-                robot.nav.plan_path((robot.rx, robot.ry), waypoints[current_wp_idx])
+                print(f"{robot.robot_id}: Pattern complete. Stopping run.")
+                
+                # Stop motors
+                robot.lm.setVelocity(0)
+                robot.rm.setVelocity(0)
+                
+                return
