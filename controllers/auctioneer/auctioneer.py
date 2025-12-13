@@ -15,36 +15,7 @@ if os.path.dirname(os.path.dirname(__file__)) not in sys.path:
 
 from lib_shared.dual_logger import Logger
 from lib_shared.map_module import get_map
-from lib_shared.CONFIG import AUCTION_STRATEGY, TRASH_SPAWN_STRATEGY, FIXED_TRASH_LOCATIONS, TRASH_LAYOUT
-
-
-# How long to wait for bids before closing an auction
-AUCTION_WAIT_TIME = 2.0  # in seconds
-
-TRASH_TEMPLATE = """
-DEF TRASH_%d Solid {
-  translation %f %f 0.1
-  children [
-    Shape {
-      appearance PBRAppearance {
-        baseColor 0 0 1
-        roughness 0.5
-        metalness 0
-      }
-      geometry Sphere {
-        radius 0.05
-      }
-    }
-  ]
-  boundingObject Sphere {
-    radius 0.05
-  }
-  physics Physics {
-    density -1
-    mass 1
-  }
-}
-"""
+from lib_shared.CONFIG import *
 
 class Auctioneer(Supervisor):
     """Supervisor that manages trash tasks and auctions them to collectors."""
@@ -84,7 +55,7 @@ class Auctioneer(Supervisor):
         # Collector state (for nearest-task strategy), collector_id -> (x, z)
         self.collector_positions = {}
 
-        self.setup = "SWARM" # Default
+        self.setup = "AUCTION" # Default
         self_node = self.getFromDef("auctioneer")
         if self_node:
             data = self_node.getField("customData").getSFString()

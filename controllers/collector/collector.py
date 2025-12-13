@@ -3,7 +3,7 @@
 # ============================================= #
 # Collector robot: bids while moving, executes  #
 # tasks FIFO, reports idle + position for       #
-# auctioneer's allocation strategies.         #
+# auctioneer's allocation strategies.           #
 # ============================================= #
 
 from controller import Robot

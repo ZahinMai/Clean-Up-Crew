@@ -1,16 +1,16 @@
 # =========================================================
-# Auction strategy:
-# =========================================================
 # "sequential"   -> lowest unused task_id first
 # "nearest_task" -> task closest to any known collector pos
 # "random"       -> random unassigned, uncompleted task
 # =========================================================
-AUCTION_STRATEGY = "sequential"     # "sequential" | "nearest_task" | "load_balanced"
+AUCTION_STRATEGY = "sequential"
 bid_strategy = "plain_distance"      # "plain_distance" | "queue_aware" (unused rn)
-TRASH_SPAWN_STRATEGY = "fixed"               # random | fixed
+TRASH_SPAWN_STRATEGY = "fixed"       # random | fixed
 DANGER_ZONE = 0.1      # meters - stop forward motion
 CAUTION_ZONE = 0.2     # meters - slow down significantly
 SLOW_ZONE = 0.3        # meters - reduce speed
+TRASH_LAYOUT  = "trash layout 1"
+
 FIXED_TRASH_LOCATIONS = {
     "trash layout 1": {
         (-1.167, -0.833),
@@ -52,4 +52,29 @@ FIXED_TRASH_LOCATIONS = {
     }
 }
 
-TRASH_LAYOUT  = "trash layout 3"
+TRASH_TEMPLATE = """
+DEF TRASH_%d Solid {
+  translation %f %f 0.1
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0 1
+        roughness 0.5
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.05
+      }
+    }
+  ]
+  boundingObject Sphere {
+    radius 0.05
+  }
+  physics Physics {
+    density -1
+    mass 1
+  }
+}
+"""
+# How long to wait for bids before closing an auction
+AUCTION_WAIT_TIME = 2.0  # in seconds
