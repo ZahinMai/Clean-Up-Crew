@@ -84,7 +84,7 @@ class Auctioneer(Supervisor):
         # Collector state (for nearest-task strategy), collector_id -> (x, z)
         self.collector_positions = {}
 
-        self.setup = "AUCTION" # Default
+        self.setup = "SWARM" # Default
         self_node = self.getFromDef("auctioneer")
         if self_node:
             data = self_node.getField("customData").getSFString()
