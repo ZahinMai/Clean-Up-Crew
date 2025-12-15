@@ -1,208 +1,315 @@
-# Cafeteria Clean-Up-Crew: Auction-Based Multi-Robot Coordination
+# Cafeteria Clean-Up-Crew: Benchmarking Multi-Robot Coordination Strategies
 
-**A Webots simulation framework implementing a "Spotter-Collector" architecture for efficient automated cleaning.**
+**A Webots-based benchmarking framework for evaluating task allocation and coordination strategies in autonomous cleaning robots.**
 
 ## Overview
 
-This project simulates a cafeteria environment where a coordinated team of robots identifies and removes trash. Unlike brute-force swarm approaches, this system utilises **role specialisation** and an **auction-based task allocation** protocol to minimize redundant travel and maximize efficiency.
+This project is **not just a Multi-Agent System (MAS) simulator** — it is a **controlled benchmarking framework** designed to **systematically compare coordination strategies** for automated cleaning in a cafeteria environment.
 
-### The Team (v2.0 Architecture)
+Rather than demonstrating a single “smart” solution, the system enables **side-by-side evaluation** of four paradigms under identical conditions:
 
-1.  **The Auctioneer (Supervisor):**
-      * **Role:** Replaces the physical "Spotter" robot from v1.0.
-      * **Function:** Spawns trash, monitors simulation state, and broadcasts auctions to workers. It serves as the central coordination node.
-2.  **The Collectors (TurtleBot3 Burger):**
-      * **Role:** Worker robots.
-      * **Function:** "Blind" agents that receive task coordinates via auctions. They navigate using a global A\* planner and local reactive avoidance.
-3.  **The Human Agent:**
-      * **Role:** Dynamic Obstacle.
-      * **Function:** Patrols a fixed route to test the Collectors' collision avoidance capabilities.
+1. **Baseline:** A single autonomous robot (no coordination).
+2. **Swarm:** Multiple robots operating without explicit task allocation.
+3. **Auction-Based Coordination:** Three distinct auction strategies.
 
------
+All experiments are run in the **same world, with the same obstacles, navigation stack, and trash distribution**, allowing performance differences to be attributed directly to **coordination strategy**, not environmental variance.
+
+---
+
+## Benchmarking Scenarios
+
+Each simulation run operates in one of the following controlled setups:
+
+| Mode | Description |
+|----|----|
+| **BASELINE** | One robot performs all cleaning tasks sequentially |
+| **SWARM** | Multiple robots act independently without coordination |
+| **AUCTION – Sequential** | Centralised auction, FIFO task ordering |
+| **AUCTION – Nearest Task** | Centralised auction optimising fleet-wide travel distance |
+| **AUCTION – Random** | Randomised task selection for robustness testing |
+
+The default and primary experimental focus is **auction-based coordination**, with the baseline and swarm modes acting as **control conditions**.
+
+---
 
 ## System Architecture
 
-The project has evolved into a robust Multi-Agent System (MAS) focusing on task allocation efficiency and navigation stability.
+The system follows a **Spotter–Collector-inspired architecture**, evolved into a **benchmark-ready Multi-Agent System** with strict role separation and logging.
 
-### 1\. Task Allocation (The Auction)
+### The Team (v2.0 Architecture)
+
+1. **The Auctioneer (Supervisor):**
+   * **Role:** Central coordination and benchmarking controller.
+   * **Function:**  
+     * Spawns trash deterministically  
+     * Monitors simulation state  
+     * Runs auctions  
+     * Assigns tasks  
+     * Logs all task allocation decisions  
+
+2. **The Collectors (TurtleBot3 Burger):**
+   * **Role:** Worker robots under evaluation.
+   * **Function:**  
+     * Receive task coordinates only  
+     * Plan paths using A*  
+     * Execute navigation and obstacle avoidance  
+     * Log execution metrics  
+
+3. **The Human Agent:**
+   * **Role:** Dynamic obstacle.
+   * **Function:**  
+     * Patrols a fixed route  
+     * Introduces non-deterministic motion  
+     * Stress-tests collision avoidance consistency across strategies  
+
+---
+
+## 1. Task Allocation Benchmark (Auction System)
 
 **Managed by:** `controllers/auctioneer/auctioneer.py`
 
-The system implements a **Single-Item Auction** protocol:
+The auction mechanism is implemented as a **Single-Item Auction Protocol**, allowing clean isolation of allocation logic from navigation and sensing.
 
-1.  **Announcement:** The Supervisor broadcasts an `auction_start` message with the location of a trash item.
-2.  **Bidding:** Idle Collectors calculate the path cost (Euclidean distance) to the target and submit a `bid`.
-3.  **Winner Selection:** The Supervisor waits for a timeout (2.0s), selects the lowest bidder, and sends an `assign_task` command.
-4.  **Task Chaining:** Robots can queue tasks if assigned multiple targets, preventing idle time.
+### Auction Lifecycle
 
-#### Strategies & Logic
+1. **Announcement**  
+   The Auctioneer broadcasts an `auction_start` message with a trash location.
 
-You can toggle the allocation logic in `controllers/lib_shared/CONFIG.py`.
+2. **Bidding**  
+   Idle Collectors compute their path cost (Euclidean distance) and submit a `bid`.
 
-**A. Sequential Allocation (`"sequential"`)**
+3. **Winner Selection**  
+   After a fixed timeout (2.0s), the Auctioneer selects the lowest bid.
 
-  * **Logic:** Auctions tasks in ID order (FIFO). This is the default greedy approach.
+4. **Assignment**  
+   The winner receives an `assign_task` command and queues the task.
 
-<!-- end list -->
+5. **Task Chaining**  
+   Robots may queue multiple assignments, preventing idle gaps.
 
-```text
-      [ Task List (Sorted by ID) ]
-      ┌─────────┬─────────┬─────────┐
-      │ Task_00 │ Task_01 │ Task_02 │ ...
-      └────┬────┴─────────┴─────────┘
-           │
-           ▼
-    ( Selects First )
-           │
-   ┌───────▼───────┐
-   │  AUCTIONEER   │  ── "Who wants Task_00?" ──▶  [ Collectors ]
-   └───────────────┘
-```
+---
 
-**B. Nearest Task Allocation (`"nearest_task"`)**
+## Auction Strategies Under Test
 
-  * **Logic:** The Auctioneer calculates the distance from **every idle robot** to **every available task** and selects the task that minimizes travel time for the fleet.
+All strategies are interchangeable via configuration, enabling **direct benchmarking**.
 
-<!-- end list -->
+### A. Sequential Allocation (`"sequential"`)
+
+**Purpose:** Greedy baseline for auction-based coordination.
+
+* Tasks are auctioned strictly in ID (FIFO) order.
+* Ignores robot distribution and global efficiency.
 
 ```text
-        Task_A                        Task_B
-          │                             │
-    (5m away)                     (1m away)
-          │                             │
-    ┌─────▼─────┐                 ┌─────▼─────┐
-    │ Collector │                 │ Collector │
-    │    #1     │                 │    #2     │
-    └───────────┘                 └───────────┘
-          ▲                             ▲
-          └──────────────┬──────────────┘
-                         │
-                  (Compares Distances)
-                         │
-             ┌───────────▼───────────┐
-             │      AUCTIONEER       │ ── "Task_B is closest to a bot."
-             │  Selects Task_B next  │ ── "Who wants Task_B?" ──▶
-             └───────────────────────┘
-```
+[ Task List (Sorted by ID) ]
+┌─────────┬─────────┬─────────┐
+│ Task_00 │ Task_01 │ Task_02 │ ...
+└────┬────┴─────────┴─────────┘
+     │
+     ▼
+( Selects First )
+     │
+┌────▼────────────┐
+│   AUCTIONEER    │ ── "Who wants Task_00?" ──▶ [ Collectors ]
+└─────────────────┘
+````
 
-**C. Random Allocation (`"random"`)**
+---
 
-  * **Logic:** Selects a random task from the pool to load-balance or test robustness.
+### B. Nearest Task Allocation (`"nearest_task"`)
 
-<!-- end list -->
+**Purpose:** Primary optimisation strategy under evaluation.
+
+* Computes distance from **every idle robot** to **every available task**.
+* Selects the task that minimises overall fleet travel cost.
 
 ```text
-     [ Task Pool ]
-    { Task_05, Task_02, Task_09, Task_01 }
-           │
-           ▼
-    (Random Roll) ──▶ Picks Task_09
-           │
-   ┌───────▼───────┐
-   │  AUCTIONEER   │  ── "Who wants Task_09?" ──▶  [ Collectors ]
-   └───────────────┘
+    Task_A                      Task_B
+      │                           │
+(5m away)                   (1m away)
+      │                           │
+┌─────▼─────┐               ┌─────▼─────┐
+│ Collector │               │ Collector │
+│    #1     │               │    #2     │
+└───────────┘               └───────────┘
+      ▲                           ▲
+      └────────────┬─────────────┘
+                   │
+            (Compare Distances)
+                   │
+        ┌──────────▼───────────┐
+        │      AUCTIONEER       │
+        │  Selects Task_B next  │ ── "Who wants Task_B?" ──▶
+        └──────────────────────┘
 ```
 
-### 2\. Navigation Stack
+---
+
+### C. Random Allocation (`"random"`)
+
+**Purpose:** Stress-test and control strategy.
+
+* Randomly selects a task from the pool.
+* Useful for robustness testing and null-hypothesis comparison.
+
+```text
+[ Task Pool ]
+{ Task_05, Task_02, Task_09, Task_01 }
+       │
+       ▼
+ (Random Roll) ──▶ Picks Task_09
+       │
+┌──────▼─────────┐
+│   AUCTIONEER   │ ── "Who wants Task_09?" ──▶ [ Collectors ]
+└────────────────┘
+```
+
+---
+
+## 2. Navigation Stack (Controlled Variable)
 
 **Managed by:** `controllers/lib_shared/navigation.py`
 
-  * \**Global Planner (A*):\*\*
-      * Uses a binary **Occupancy Grid** (`map_module.py`) to represent the cafeteria.
-      * Plans an optimal path of grid cells, then smooths them into world-space waypoints.
-  * **Local Planner (Reactive Avoidance):**
-      * *Note: DWA was removed from Collectors in v2.0 for stability.*
-      * Uses **Simple Avoidance** (`obstacle_avoidance.py`): A lightweight controller that slows down or turns in place when LiDAR detects obstacles within a critical radius (\<0.25m).
+Navigation is intentionally **identical across all experiments** to isolate coordination effects.
 
------
+### Global Planner (A*)
+
+* Binary occupancy grid (`map_module.py`)
+* Produces optimal grid-based paths
+* Smoothed into world-space waypoints
+
+### Local Planner (Reactive Avoidance)
+
+* Lightweight avoidance (`obstacle_avoidance.py`)
+* LiDAR-based proximity detection
+* Slows or rotates in place when obstacles < 0.25m
+* DWA intentionally removed in v2.0 to improve repeatability
+
+---
 
 ## Installation & Usage
 
 ### Prerequisites
 
-  * **Webots R2025a** (or compatible)
-  * **Python 3.8+**
+* **Webots R2025a** (or compatible)
+* **Python 3.8+**
 
 ### Dependencies
 
-The project relies on the **Python Standard Library** and Webots API. No external `pip` installations are required.
+Only the Python Standard Library and Webots API are used.
 
-  * **Webots API:** `controller`
-  * **Standard Libs:** `math`, `json`, `sys`, `os`, `datetime`, `random`, `collections`, `heapq`, `dataclasses`, `typing`.
+* `controller`
+* `math`, `json`, `sys`, `os`, `datetime`, `random`
+* `collections`, `heapq`, `dataclasses`, `typing`
 
-### Running the Simulation
+---
 
-1.  **Clone the repository:**
-    ```bash
-    git clone [https://github.com/ZahinMai/Clean-Up-Crew.git](https://github.com/ZahinMai/Clean-Up-Crew.git)
-    ```
-2.  **Launch Webots:**
-    Open the world file: `worlds/cafetria.wbt`.
-3.  **Start:**
-    Press **Play**. The Supervisor will spawn trash and begin the auction cycle immediately.
+## Running the Benchmark
 
-### Configuration
+1. **Clone the repository**
 
-To change the auction strategy, edit `controllers/lib_shared/CONFIG.py`:
-(Note: bidding strategy yet to be implemented)
+   ```bash
+   git clone https://github.com/ZahinMai/Clean-Up-Crew.git
+   ```
+
+2. **Open Webots**
+
+   * Load: `worlds/cafetria.wbt`
+
+3. **Select Benchmark Mode**
+
+   * In the scene tree, select the `auctioneer` node
+   * Edit `customData`:
+
+     * `SETUP:BASELINE`
+     * `SETUP:SWARM`
+     * `SETUP:AUCTION`
+
+4. **Press Play**
+
+   * Trash spawning, task allocation, and logging begin immediately
+
+---
+
+## Configuration
+
+### Auction Strategy Selection
+
+Edit `controllers/lib_shared/CONFIG.py`:
 
 ```python
 # Options: "sequential", "nearest_task", "random"
 auction_strategy = "nearest_task"
 ```
 
-To change the simulation setup, navigate to the `auctioneer` bot in the scene tree 
-and edit the customData field to be "SETUP:AUCTION", "SETUP:SWARM", "SETUP:BASELINE".
-The default simulation run is "SETUP:AUCTION".
+---
 
-## Logging & Output
+## Logging & Experimental Output
 
-With each simulation run, a text file of the debug output from the console is saved automatically. The system uses a custom `DualLogger` to capture `stdout` and write it to markdown files for post-run analysis.
+Each run automatically generates timestamped logs to support **quantitative and qualitative analysis**.
 
-  * Logs are initialised immediately when the controllers start.
-  * Auctioneer logs:
-     * Located in  `controllers/auctioneer/logs/`
-     * Record of every auction start, bid received, winner assignment, and task completion event.
-  * Collector logs
-     * Located in `controllers/collector/logs/`
-     * Records state transitions (`IDLE` -\> `NAVIGATING`), path planning metrics (number of waypoints), and ASCII map visualizations showing the robot's position and path 
-  * Files are named with timestamps to prevent overwrites, e.g., `auction_output_20251211_224745.md` or `nav_output_20251211_224745.md`.
+### Auctioneer Logs
 
------
+* Location: `controllers/auctioneer/logs/`
+* Records:
+
+  * Auction starts
+  * Bids received
+  * Winner selection
+  * Task completion
+
+### Collector Logs
+
+* Location: `controllers/collector/logs/`
+* Records:
+
+  * FSM transitions (`IDLE → NAVIGATING`)
+  * Path length and waypoint count
+  * ASCII occupancy grid visualisations
+
+Example filenames:
+
+```text
+auction_output_20251211_224745.md
+nav_output_20251211_224745.md
+```
+
+---
 
 ## File Structure
 
 ```text
 Clean-Up-Crew/
 ├── controllers/
-│   ├── auctioneer/             # Supervisor logic (New central coordinator)
-│   │   └── auctioneer.py       # Main spawning & auction logic
-│   ├── collector/              # Worker robot logic
-│   │   └── collector.py        # FSM: IDLE <-> NAVIGATING
-│   ├── Human_agent/            # Dynamic obstacle logic
-│   ├── lib_shared/             # SHARED LIBRARIES
-│   │   ├── communication.py    # JSON messaging wrapper
-│   │   ├── global_planner.py   # A* Implementation
-│   │   ├── navigation.py       # Navigation Manager
-│   │   ├── obstacle_avoidance.py # Simple Reactive Dodge
-│   │   └── map_module.py       # Occupancy Grid
-│   └── archive/                # Deprecated components
-│       └── spotter.py          # Legacy visual search robot & related modules (v1.0)
+│   ├── auctioneer/              # Central coordinator & benchmark controller
+│   │   └── auctioneer.py
+│   ├── collector/               # Worker robot FSM
+│   │   └── collector.py
+│   ├── Human_agent/             # Dynamic obstacle
+│   ├── lib_shared/              # Shared infrastructure
+│   │   ├── communication.py
+│   │   ├── global_planner.py
+│   │   ├── navigation.py
+│   │   ├── obstacle_avoidance.py
+│   │   └── map_module.py
+│   └── archive/                 # Deprecated v1.0 components
+│       └── spotter.py
 └── worlds/
-    └── cafetria.wbt            # Simulation Environment
+    └── cafetria.wbt
 ```
 
------
+---
 
 ## Contributors
 
-  * **Zahin Maisa:** Architecture, A\* Navigation, Task Allocation System, Auctioneer Supervisor, Collector FSM.
-  * **Abdullateef Vahora:** Supervisor Legacy Vision System.
-  * **Ajinkya:** World Design, Dynamic Obstacle and Human Agent
-  * **Kunal:** Communication Protocol
+* **Zahin Maisa:** System architecture, benchmarking design, auctioneer, A* navigation, collector FSM
+* **Abdullateef Vahora:** Legacy vision system (v1.0)
+* **Ajinkya:** World design, dynamic obstacle, human agent
+* **Kunal:** Communication protocol
 
------
+---
 
 ## License
 
 This project is licensed under the **MIT License**.
+
