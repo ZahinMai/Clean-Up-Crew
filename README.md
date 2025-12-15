@@ -299,16 +299,6 @@ Clean-Up-Crew/
 ```
 
 ---
-
-## Contributors
-
-* **Zahin Maisa:** System architecture, benchmarking design, auctioneer, A* navigation, collector FSM
-* **Abdullateef Vahora:** Legacy vision system (v1.0)
-* **Ajinkya:** World design, dynamic obstacle, human agent
-* **Kunal:** Communication protocol
-
----
-
 ## License
 
 This project is licensed under the **MIT License**.
