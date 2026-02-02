@@ -3,10 +3,7 @@
 **A Webots-based benchmarking framework for evaluating task allocation and coordination strategies in autonomous cleaning robots.**
 
 ## Overview
-
-This project is **not just a Multi-Agent System (MAS) simulator** — it is a **controlled benchmarking framework** designed to **systematically compare coordination strategies** for automated cleaning in a cafeteria environment.
-
-Rather than demonstrating a single “smart” solution, the system enables **side-by-side evaluation** of four paradigms under identical conditions:
+This **Multi-Agent System (MAS) simulator** is a **benchmarking tool** designed to **systematically compare coordination strategies** for automated cleaning in a cafeteria environment. Rather than demonstrating a single “smart” solution, the system enables **side-by-side evaluation** of four paradigms under identical conditions:
 
 1. **Baseline:** A single autonomous robot (no coordination).
 2. **Swarm:** Multiple robots operating without explicit task allocation.
@@ -17,7 +14,6 @@ All experiments are run in the **same world, with the same obstacles, navigation
 ---
 
 ## Benchmarking Scenarios
-
 Each simulation run operates in one of the following controlled setups:
 
 | Mode | Description |
@@ -72,29 +68,22 @@ The auction mechanism is implemented as a **Single-Item Auction Protocol**, allo
 
 ### Auction Lifecycle
 
-1. **Announcement**  
-   The Auctioneer broadcasts an `auction_start` message with a trash location.
+1. **Announcement**: The Auctioneer broadcasts an `auction_start` message with a trash location.
 
-2. **Bidding**  
-   Idle Collectors compute their path cost (Euclidean distance) and submit a `bid`.
+2. **Bidding**: Idle Collectors compute their path cost (Euclidean distance) and submit a `bid`.
 
-3. **Winner Selection**  
-   After a fixed timeout (2.0s), the Auctioneer selects the lowest bid.
+3. **Winner Selection**: After a fixed timeout (2.0s), the Auctioneer selects the lowest bid.
 
-4. **Assignment**  
-   The winner receives an `assign_task` command and queues the task.
+4. **Assignment**: The winner receives an `assign_task` command and queues the task.
 
-5. **Task Chaining**  
-   Robots may queue multiple assignments, preventing idle gaps.
+5. **Task Chaining**: Robots may queue multiple assignments, preventing idle gaps.
 
 ---
 
 ## Auction Strategies Under Test
-
 All strategies are interchangeable via configuration, enabling **direct benchmarking**.
 
 ### A. Sequential Allocation (`"sequential"`)
-
 **Purpose:** Greedy baseline for auction-based coordination.
 
 * Tasks are auctioned strictly in ID (FIFO) order.
@@ -211,28 +200,23 @@ Only the Python Standard Library and Webots API are used.
    ```bash
    git clone https://github.com/ZahinMai/Clean-Up-Crew.git
    ```
-
-2. **Open Webots**
-
+   
+2. **Open Webots World**
    * Load: `worlds/cafetria.wbt`
 
 3. **Select Benchmark Mode**
-
    * In the scene tree, select the `auctioneer` node
    * Edit `customData`:
-
      * `SETUP:BASELINE`
      * `SETUP:SWARM`
      * `SETUP:AUCTION`
 
 4. **Press Play**
-
    * Trash spawning, task allocation, and logging begin immediately
 
 ---
 
 ## Configuration
-
 ### Auction Strategy Selection
 
 Edit `controllers/lib_shared/CONFIG.py`:
@@ -243,7 +227,6 @@ auction_strategy = "nearest_task"
 ```
 
 ---
-
 ## Logging & Experimental Output
 
 Each run automatically generates timestamped logs to support **quantitative and qualitative analysis**.
@@ -300,6 +283,5 @@ Clean-Up-Crew/
 
 ---
 ## License
-
 This project is licensed under the **MIT License**.
 
